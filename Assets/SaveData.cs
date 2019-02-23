@@ -37,13 +37,13 @@ namespace RDP.SaveLoadSystem.Internal
 		public SaveDataItem(string key, object value)
 		{
 			SectionKey = key;
-			ValueType = value.GetType().FullName;
-			SectionValueString = (value.GetType().IsValueType && !value.GetType().IsPrimitive) ? JsonUtility.ToJson(value) : value.ToString();
+			ValueType = value.GetType().AssemblyQualifiedName;
+			SectionValueString = PrimitiveToValueParserUtility.ToJSON(value);
 		}
 
 		public object GetValue()
 		{
-			return PrimitiveToValueParserUtility.Parse(SectionValueString, Type.GetType(ValueType));
+			return PrimitiveToValueParserUtility.FromJSON(SectionValueString, Type.GetType(ValueType));
 		}
 
 		public static Dictionary<string, object> ToDictionary(SaveDataItem[] itemsCollection)
