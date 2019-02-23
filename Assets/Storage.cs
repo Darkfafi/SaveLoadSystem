@@ -129,7 +129,7 @@ namespace RDP.SaveLoadSystem
 								StorageDictionary storageDictForRef = new StorageDictionary();
 								storageDictForRef.Using(refHandler);
 								referencesSaved.Add(refID, storageDictForRef);
-								storageDictForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceInstance.GetType().FullName);
+								storageDictForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceInstance.GetType().AssemblyQualifiedName);
 								referenceInstance.Save(storageDictForRef);
 								storageDictForRef.StopUsing();
 							}
