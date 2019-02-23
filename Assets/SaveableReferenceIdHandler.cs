@@ -94,6 +94,7 @@ namespace RDP.SaveLoadSystem
 			_refReadyActions = null;
 
 			IdForReferenceCreatedEvent = null;
+			ReferenceRequestedEvent = null;
 
 			_refCounter = 0L;
 		}
