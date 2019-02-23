@@ -2,25 +2,35 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
 	public class Storage
 	{
+		public enum EncodingType
+		{
+			None,
+			Base64,
+		}
+
 		public const string ROOT_SAVE_DATA_CAPSULE_ID = "ID_CAPSULE_SAVE_DATA";
 		public const string KEY_REFERENCE_TYPE_STRING = "RESERVED_REFERENCE_TYPE_FULL_NAME_STRING_RESERVED";
 		public const string SAVE_FILE_EXTENSION = "rdpsf";
 
 		private Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> _cachedStorageCapsules = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
+		private EncodingType _encodingOption;
 
 		public static string GetPathToStorageCapsule(IStorageCapsule capsule, bool addFileType)
 		{
 			return Path.Combine(Application.persistentDataPath, capsule.ID + (addFileType ? "." + SAVE_FILE_EXTENSION : ""));
 		}
 
-		public Storage(string storageLocation, params IStorageCapsule[] allStorageCapsules)
+		public Storage(string storageLocation, EncodingType encodingType, params IStorageCapsule[] allStorageCapsules)
 		{
+			_encodingOption = encodingType;
 			for(int i = 0, c = allStorageCapsules.Length; i < c; i++)
 			{
 				_cachedStorageCapsules.Add(allStorageCapsules[i], null);
@@ -103,7 +113,6 @@ namespace RDP.SaveLoadSystem
 				{
 					if(storageCapsuleIDs == null || storageCapsuleIDs.Length == 0 || Array.IndexOf(storageCapsuleIDs, pair.Key.ID) >= 0)
 					{
-
 						Dictionary<string, StorageDictionary> referencesSaved = new Dictionary<string, StorageDictionary>();
 
 						Action<string, IRefereceSaveable> refDetectedAction = (refID, referenceInstance) =>
@@ -200,7 +209,11 @@ namespace RDP.SaveLoadSystem
 
 					using(StreamWriter writer = new StreamWriter(GetPathToStorageCapsule(capsuleMapItem.Key, true)))
 					{
-						writer.Write(jsonString);
+						writer.Write(Encode(JsonUtility.ToJson(new SaveFileWrapper()
+						{
+							SafeFileText = jsonString,
+							SaveFilePassword = GetEncryptionPassword(jsonString)
+						})));
 					}
 				}
 			}
@@ -232,7 +245,15 @@ namespace RDP.SaveLoadSystem
 				using(StreamReader reader = File.OpenText(path))
 				{
 					string jsonString = reader.ReadToEnd();
-					return JsonUtility.FromJson<SaveData>(jsonString);
+					SaveFileWrapper saveFileWrapper = JsonUtility.FromJson<SaveFileWrapper>(Decode(jsonString));
+					if(ValidateEncryptionPassword(saveFileWrapper.SaveFilePassword, saveFileWrapper.SafeFileText))
+					{
+						return JsonUtility.FromJson<SaveData>(saveFileWrapper.SafeFileText);
+					}
+					else
+					{
+						Debug.Log("SAVE FILE IS CORRUPT, NEW SAVE FILE CREATED!");
+					}
 				}
 			}
 
@@ -240,6 +261,52 @@ namespace RDP.SaveLoadSystem
 			{
 				CapsuleID = capsuleToLoad.ID,
 			};
+		}
+
+		private string Encode(string text)
+		{
+			switch(_encodingOption)
+			{
+				case EncodingType.None:
+					return text;
+				case EncodingType.Base64:
+					return Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+				default:
+					Debug.LogErrorFormat ("Encryption type {0} not supported!", _encodingOption);
+					return text;
+			}
+		}
+
+		private string Decode(string text)
+		{
+			switch(_encodingOption)
+			{
+				case EncodingType.None:
+					return text;
+				case EncodingType.Base64:
+					return Encoding.UTF8.GetString(Convert.FromBase64String(text));
+				default:
+					Debug.LogErrorFormat("Decryption type {0} not supported!", _encodingOption);
+					return text;
+			}
+		}
+
+		private string GetEncryptionPassword(string fileText)
+		{
+			HashAlgorithm algorithm = MD5.Create();
+			List<byte> bytes = new List<byte>(Encoding.UTF8.GetBytes(Encode(fileText)));
+			bytes.AddRange(Encoding.UTF8.GetBytes(fileText));
+
+			StringBuilder sb = new StringBuilder();
+			foreach(byte b in algorithm.ComputeHash(bytes.ToArray()))
+				sb.Append(b.ToString("X2"));
+
+			return Encode(sb.ToString());
+		}
+
+		private bool ValidateEncryptionPassword(string password, string fileText)
+		{
+			return password == GetEncryptionPassword(fileText);
 		}
 	}
 

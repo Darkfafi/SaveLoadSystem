@@ -5,6 +5,13 @@ using UnityEngine;
 
 namespace RDP.SaveLoadSystem.Internal
 {
+	[SerializeField]
+	public struct SaveFileWrapper
+	{
+		public string SaveFilePassword;
+		public string SafeFileText;
+	}
+
 	[Serializable]
 	public struct SaveData
 	{

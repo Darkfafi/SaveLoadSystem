@@ -19,7 +19,7 @@ public class A : MonoBehaviour, IStorageCapsule
 
 	public void Awake()
 	{
-		_storage = new Storage("GameStorage", this);
+		_storage = new Storage("GameStorage", Storage.EncodingType.Base64, this);
 		_storage.Load("Game");
 	}
 
