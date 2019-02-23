@@ -22,14 +22,21 @@ namespace RDP.SaveLoadSystem
 
 		private Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> _cachedStorageCapsules = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
 		private EncodingType _encodingOption;
+		private string _storageLocationPath;
 
-		public static string GetPathToStorageCapsule(IStorageCapsule capsule, bool addFileType)
+		public static string GetPathToStorageCapsule(string locationPath, IStorageCapsule capsule, bool addFileType)
 		{
-			return Path.Combine(Application.persistentDataPath, capsule.ID + (addFileType ? "." + SAVE_FILE_EXTENSION : ""));
+			return Path.Combine(Application.persistentDataPath, string.Concat(locationPath, capsule.ID + (addFileType ? "." + SAVE_FILE_EXTENSION : "")));
 		}
 
-		public Storage(string storageLocation, EncodingType encodingType, params IStorageCapsule[] allStorageCapsules)
+		public static string GetPathToStorage(string locationPath)
 		{
+			return Path.Combine(Application.persistentDataPath, locationPath);
+		}
+
+		public Storage(string storageLocationPath, EncodingType encodingType, params IStorageCapsule[] allStorageCapsules)
+		{
+			_storageLocationPath = storageLocationPath;
 			_encodingOption = encodingType;
 			for(int i = 0, c = allStorageCapsules.Length; i < c; i++)
 			{
@@ -104,7 +111,7 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
-		public void Save(params string[] storageCapsuleIDs)
+		public void Save(bool flushAfterSave, params string[] storageCapsuleIDs)
 		{
 			Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> buffer = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
 			using(SaveableReferenceIdHandler refHandler = new SaveableReferenceIdHandler())
@@ -147,6 +154,9 @@ namespace RDP.SaveLoadSystem
 			{
 				_cachedStorageCapsules[pair.Key] = pair.Value;
 			}
+
+			if(flushAfterSave)
+				Flush(storageCapsuleIDs);
 		}
 
 		public void FlushClear(bool removeSaveFiles, params string[] storageCapsuleIDs)
@@ -160,11 +170,14 @@ namespace RDP.SaveLoadSystem
 				}
 			}
 
+			if(!Directory.Exists(GetPathToStorage(_storageLocationPath)))
+				return;
+
 			foreach(var pair in buffer)
 			{
 				if(removeSaveFiles)
 				{
-					string pathToFile = GetPathToStorageCapsule(pair.Key, true);
+					string pathToFile = GetPathToStorageCapsule(_storageLocationPath, pair.Key, true);
 					if(File.Exists(pathToFile))
 					{
 						File.Delete(pathToFile);
@@ -175,6 +188,9 @@ namespace RDP.SaveLoadSystem
 					_cachedStorageCapsules[pair.Key] = pair.Value;
 				}
 			}
+
+			if(Directory.GetFiles(GetPathToStorage(_storageLocationPath)).Length == 0)
+				Directory.Delete(GetPathToStorage(_storageLocationPath));
 
 			if(!removeSaveFiles)
 				Flush(storageCapsuleIDs);
@@ -207,7 +223,12 @@ namespace RDP.SaveLoadSystem
 						ReferencesSaveData = sectionsForReferences.ToArray(),
 					});
 
-					using(StreamWriter writer = new StreamWriter(GetPathToStorageCapsule(capsuleMapItem.Key, true)))
+					if(!Directory.Exists(GetPathToStorage(_storageLocationPath)))
+					{
+						Directory.CreateDirectory(GetPathToStorage(_storageLocationPath));
+					}
+
+					using(StreamWriter writer = new StreamWriter(GetPathToStorageCapsule(_storageLocationPath, capsuleMapItem.Key, true)))
 					{
 						writer.Write(Encode(JsonUtility.ToJson(new SaveFileWrapper()
 						{
@@ -239,7 +260,7 @@ namespace RDP.SaveLoadSystem
 
 		private SaveData LoadFromDisk(IStorageCapsule capsuleToLoad)
 		{
-			string path = GetPathToStorageCapsule(capsuleToLoad, true);
+			string path = GetPathToStorageCapsule(_storageLocationPath, capsuleToLoad, true);
 			if(File.Exists(path))
 			{
 				using(StreamReader reader = File.OpenText(path))
