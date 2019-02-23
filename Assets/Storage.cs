@@ -223,18 +223,26 @@ namespace RDP.SaveLoadSystem
 						ReferencesSaveData = sectionsForReferences.ToArray(),
 					});
 
-					if(!Directory.Exists(GetPathToStorage(_storageLocationPath)))
-					{
-						Directory.CreateDirectory(GetPathToStorage(_storageLocationPath));
-					}
 
-					using(StreamWriter writer = new StreamWriter(GetPathToStorageCapsule(_storageLocationPath, capsuleMapItem.Key, true)))
+					try
 					{
-						writer.Write(Encode(JsonUtility.ToJson(new SaveFileWrapper()
+						if(!Directory.Exists(GetPathToStorage(_storageLocationPath)))
 						{
-							SafeFileText = jsonString,
-							SaveFilePassword = GetEncryptionPassword(jsonString)
-						})));
+							Directory.CreateDirectory(GetPathToStorage(_storageLocationPath));
+						}
+
+						using(StreamWriter writer = new StreamWriter(GetPathToStorageCapsule(_storageLocationPath, capsuleMapItem.Key, true)))
+						{
+							writer.Write(Encode(JsonUtility.ToJson(new SaveFileWrapper()
+							{
+								SafeFileText = jsonString,
+								SaveFilePassword = GetEncryptionPassword(jsonString)
+							})));
+						}
+					}
+					catch(Exception e)
+					{
+						throw new Exception(string.Format("Could not save file {0}. Error: {1}", capsuleMapItem.Key,  e.Message));
 					}
 				}
 			}
