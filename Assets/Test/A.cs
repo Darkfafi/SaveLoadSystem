@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class A : MonoBehaviour, IStorageCapsule
 {
+	public bool DeleteData;
+
 	private Storage _storage;
 	private RefBoy _refBoy;
 	private RefBoy _refKid;
@@ -35,6 +37,9 @@ public class A : MonoBehaviour, IStorageCapsule
 	{
 		_storage.Save("Game");
 		_storage.Flush("Game");
+
+		if(DeleteData)
+			_storage.FlushClear(false, "Game");
 	}
 
 	public void Save(IReferenceSaver saver)

@@ -140,7 +140,7 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
-		public void Clear(bool removeSaveFiles, params string[] storageCapsuleIDs)
+		public void FlushClear(bool removeSaveFiles, params string[] storageCapsuleIDs)
 		{
 			Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> buffer = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
 			foreach(var pair in _cachedStorageCapsules)
@@ -166,6 +166,9 @@ namespace RDP.SaveLoadSystem
 					_cachedStorageCapsules[pair.Key] = pair.Value;
 				}
 			}
+
+			if(!removeSaveFiles)
+				Flush(storageCapsuleIDs);
 		}
 
 		public void Flush(params string[] storageCapsuleIDs)
