@@ -1,4 +1,5 @@
 ﻿using RDP.SaveLoadSystem.Internal;
+using RDP.SaveLoadSystem.Internal.Utils;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -52,6 +53,24 @@ namespace RDP.SaveLoadSystem
 		public bool LoadStruct<T>(string key, out T value) where T : struct
 		{
 			return Load(key, out value);
+		}
+
+		public void SaveDict<T, U>(string key, Dictionary<T, U> value)
+		{
+			SaveStruct(key, SaveableDict<T, U>.From(value));
+		}
+
+		public bool LoadDict<T, U>(string key, out Dictionary<T, U> value)
+		{
+			SaveableDict<T, U> saveableDict;
+			if(LoadStruct(key, out saveableDict))
+			{
+				value = SaveableDict<T, U>.To(saveableDict);
+				return true;
+			}
+
+			value = null;
+			return false;
 		}
 
 		void IReferenceSaver.SaveRef<T>(string key, T value, bool allowNull)

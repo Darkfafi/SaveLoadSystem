@@ -58,7 +58,7 @@ namespace RDP.SaveLoadSystem
 							RefreshCachedData(capsuleToStorage.Key);
 						}
 
-						List<IRefereceSaveable> _allLoadedReferences = new List<IRefereceSaveable>();
+						List<ISaveable> _allLoadedReferences = new List<ISaveable>();
 
 						Action<string> referenceRequestedEventAction = (id) =>
 						{
@@ -79,9 +79,15 @@ namespace RDP.SaveLoadSystem
 							}
 							else if(storage.LoadValue(KEY_REFERENCE_TYPE_STRING, out classTypeFullName))
 							{
-								IRefereceSaveable referenceInstance = Activator.CreateInstance(Type.GetType(classTypeFullName)) as IRefereceSaveable;
+								IReferenceLoader loader = storage;
+								Type referenceType = Type.GetType(classTypeFullName);
+								bool methodLoadInterface = typeof(ISaveableLoad).IsAssignableFrom(referenceType);
+								ISaveable referenceInstance = (methodLoadInterface ? Activator.CreateInstance(referenceType) : Activator.CreateInstance(referenceType, loader)) as ISaveable;
 								refHandler.SetReferenceReady(referenceInstance, id);
-								referenceInstance.Load(storage);
+
+								if(methodLoadInterface)
+									((ISaveableLoad)referenceInstance).Load(loader);
+
 								_allLoadedReferences.Add(referenceInstance);
 							}
 							else
@@ -122,7 +128,7 @@ namespace RDP.SaveLoadSystem
 					{
 						Dictionary<string, StorageDictionary> referencesSaved = new Dictionary<string, StorageDictionary>();
 
-						Action<string, IRefereceSaveable> refDetectedAction = (refID, referenceInstance) =>
+						Action<string, ISaveable> refDetectedAction = (refID, referenceInstance) =>
 						{
 							if(!referencesSaved.ContainsKey(refID))
 							{
@@ -340,7 +346,7 @@ namespace RDP.SaveLoadSystem
 		}
 	}
 
-	public interface IStorageCapsule : IRefereceSaveable
+	public interface IStorageCapsule : ISaveableLoad
 	{
 		string ID
 		{

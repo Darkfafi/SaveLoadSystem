@@ -5,19 +5,19 @@ namespace RDP.SaveLoadSystem
 {
 	public class SaveableReferenceIdHandler : IDisposable
 	{
-		public delegate void StorageLoadHandler(bool wasInStorage, IRefereceSaveable instance);
-		public delegate void StorageLoadMultipleHandler(IRefereceSaveable[] instances);
+		public delegate void StorageLoadHandler(bool wasInStorage, ISaveable instance);
+		public delegate void StorageLoadMultipleHandler(ISaveable[] instances);
 
-		public event Action<string, IRefereceSaveable> IdForReferenceCreatedEvent;
+		public event Action<string, ISaveable> IdForReferenceCreatedEvent;
 		public event Action<string> ReferenceRequestedEvent;
 
-		private Dictionary<IRefereceSaveable, string> _refToIdMap = new Dictionary<IRefereceSaveable, string>();
-		private Dictionary<string, IRefereceSaveable> _idToRefMap = new Dictionary<string, IRefereceSaveable>();
+		private Dictionary<ISaveable, string> _refToIdMap = new Dictionary<ISaveable, string>();
+		private Dictionary<string, ISaveable> _idToRefMap = new Dictionary<string, ISaveable>();
 		private Dictionary<string, StorageLoadHandler> _refReadyActions = new Dictionary<string, StorageLoadHandler>();
 		private Dictionary<string, MultiRefObject> _multiRefsReadyActions = new Dictionary<string, MultiRefObject>();
 		private long _refCounter = 0L;
 
-		public string GetIdForReference(IRefereceSaveable reference)
+		public string GetIdForReference(ISaveable reference)
 		{
 			string refID;
 			if(!_refToIdMap.TryGetValue(reference, out refID))
@@ -38,7 +38,7 @@ namespace RDP.SaveLoadSystem
 			if(callback == null)
 				return;
 
-			IRefereceSaveable reference;
+			ISaveable reference;
 
 			if(_idToRefMap.TryGetValue(refID, out reference))
 			{
@@ -95,7 +95,7 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
-		public void SetReferenceReady(IRefereceSaveable refToSetReady, string refID = null)
+		public void SetReferenceReady(ISaveable refToSetReady, string refID = null)
 		{
 			if(string.IsNullOrEmpty(refID))
 				refID = GetIdForReference(refToSetReady);
@@ -146,7 +146,7 @@ namespace RDP.SaveLoadSystem
 		{
 			private StorageLoadMultipleHandler _callback;
 			private List<string> _refsToGo;
-			private List<IRefereceSaveable> _references = new List<IRefereceSaveable>();
+			private List<ISaveable> _references = new List<ISaveable>();
 
 			public MultiRefObject(string[] refsToGo, StorageLoadMultipleHandler callback)
 			{
@@ -154,7 +154,7 @@ namespace RDP.SaveLoadSystem
 				_callback = callback;
 			}
 
-			public bool CrossRefAway(string referenceId, IRefereceSaveable referenceInstance)
+			public bool CrossRefAway(string referenceId, ISaveable referenceInstance)
 			{
 				_refsToGo.Remove(referenceId);
 				_references.Add(referenceInstance);
