@@ -66,6 +66,27 @@ namespace RDP.SaveLoadSystem
 			_keyToReferenceID.Add(key, _refHandler.GetIdForReference(value));
 		}
 
+		void IReferenceSaver.SaveRefs<T>(string key, T[] values, bool allowNull)
+		{
+			if(values == null)
+			{
+				if(!allowNull)
+					Debug.LogErrorFormat("Cannot add {0} due to the value being `null`", key);
+				return;
+			}
+
+			string idsCollection = "";
+			for(int i = 0, c = values.Length; i < c; i++)
+			{
+				idsCollection += _refHandler.GetIdForReference(values[i]);
+				if(i < c - 1)
+				{
+					idsCollection += ",";
+				}
+			}
+			_keyToReferenceID.Add(key, idsCollection);
+		}
+
 		bool IReferenceLoader.LoadRef<T>(string key, StorageLoadHandler<T> refLoadedCallback)
 		{
 			object refIDObject;
@@ -87,6 +108,33 @@ namespace RDP.SaveLoadSystem
 					refLoadedCallback((T)reference);
 				else
 					refLoadedCallback(default(T));
+			});
+
+			return true;
+		}
+
+		bool IReferenceLoader.LoadRefs<T>(string key, StorageLoadMultipleHandler<T> refLoadedCallback)
+		{
+			object refIDsObject;
+
+			if(!_keyToReferenceID.TryGetValue(key, out refIDsObject))
+			{
+				refLoadedCallback(new T[] { });
+				return false;
+			}
+
+			string[] refIds = refIDsObject.ToString().Split(',');
+
+			_refHandler.GetReferencesFromID(key, refIds, (references) =>
+			{
+				if(references != null)
+				{
+					Array castedReferencesArray = Array.CreateInstance(typeof(T), references.Length);
+					Array.Copy(references, castedReferencesArray, references.Length);
+					refLoadedCallback((T[])castedReferencesArray);
+				}
+				else
+					refLoadedCallback(new T[] { });
 			});
 
 			return true;

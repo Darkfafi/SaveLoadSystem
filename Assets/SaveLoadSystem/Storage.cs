@@ -226,9 +226,10 @@ namespace RDP.SaveLoadSystem
 
 					try
 					{
-						if(!Directory.Exists(GetPathToStorage(_storageLocationPath)))
+						string pathToStorage = GetPathToStorage(_storageLocationPath);
+						if(!Directory.Exists(pathToStorage))
 						{
-							Directory.CreateDirectory(GetPathToStorage(_storageLocationPath));
+							Directory.CreateDirectory(pathToStorage);
 						}
 
 						using(StreamWriter writer = new StreamWriter(GetPathToStorageCapsule(_storageLocationPath, capsuleMapItem.Key, true)))
