@@ -68,6 +68,10 @@ namespace RDP.SaveLoadSystem
 
 		void IReferenceSaver.SaveRefs<T>(string key, T[] values, bool allowNull)
 		{
+			List<T> valuesList = new List<T>(values);
+			valuesList.RemoveAll((v) => v == null);
+			values = valuesList.ToArray();
+
 			if(values == null)
 			{
 				if(!allowNull)
@@ -84,6 +88,7 @@ namespace RDP.SaveLoadSystem
 					idsCollection += ",";
 				}
 			}
+
 			_keyToReferenceID.Add(key, idsCollection);
 		}
 
@@ -123,7 +128,7 @@ namespace RDP.SaveLoadSystem
 				return false;
 			}
 
-			string[] refIds = refIDsObject.ToString().Split(',');
+			string[] refIds = refIDsObject.ToString().Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
 			_refHandler.GetReferencesFromID(key, refIds, (references) =>
 			{
