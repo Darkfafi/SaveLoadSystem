@@ -67,6 +67,20 @@ namespace RDP.SaveLoadSystem
 			return false;
 		}
 
+		public T LoadValue<T>(string key) where T : IConvertible, IComparable
+		{
+			T value;
+			LoadValue(key, out value);
+			return value;
+		}
+
+		public T[] LoadValues<T>(string key) where T : IConvertible, IComparable
+		{
+			T[] values;
+			LoadValues(key, out values);
+			return values;
+		}
+
 		public void SaveStruct<T>(string key, T value) where T : struct
 		{
 			Save(key, value);
@@ -93,6 +107,20 @@ namespace RDP.SaveLoadSystem
 
 			values = null;
 			return false;
+		}
+
+		public T LoadStruct<T>(string key) where T : struct
+		{
+			T value;
+			LoadStruct(key, out value);
+			return value;
+		}
+
+		public T[] LoadStructs<T>(string key) where T : struct
+		{
+			T[] values;
+			LoadStructs(key, out values);
+			return values;
 		}
 
 		public void SaveDict<T, U>(string key, Dictionary<T, U> value)

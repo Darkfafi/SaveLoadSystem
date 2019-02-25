@@ -34,6 +34,10 @@ namespace RDP.SaveLoadSystem
 		bool LoadValues<T>(string key, out T[] values) where T : IConvertible, IComparable;
 		bool LoadStruct<T>(string key, out T value) where T : struct;
 		bool LoadStructs<T>(string key, out T[] values) where T : struct;
+		T LoadValue<T>(string key) where T : IConvertible, IComparable;
+		T[] LoadValues<T>(string key) where T : IConvertible, IComparable;
+		T LoadStruct<T>(string key) where T : struct;
+		T[] LoadStructs<T>(string key) where T : struct;
 		bool LoadDict<T, U>(string key, out Dictionary<T, U> value);
 		bool LoadRef<T>(string key, StorageLoadHandler<T> refAvailableCallback) where T : class, ISaveable;
 		bool LoadRefs<T>(string key, StorageLoadMultipleHandler<T> refsAvailableCallback) where T : class, ISaveable;
