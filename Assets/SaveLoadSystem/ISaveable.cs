@@ -20,7 +20,9 @@ namespace RDP.SaveLoadSystem
 	public interface IReferenceSaver
 	{
 		void SaveValue<T>(string key, T value) where T : IConvertible, IComparable;
+		void SaveValues<T>(string key, T[] values) where T : IConvertible, IComparable;
 		void SaveStruct<T>(string key, T value) where T : struct;
+		void SaveStructs<T>(string key, T[] values) where T : struct;
 		void SaveDict<T, U>(string key, Dictionary<T, U> value);
 		void SaveRef<T>(string key, T value, bool allowNull = false) where T : class, ISaveable;
 		void SaveRefs<T>(string key, T[] values, bool allowNull = false) where T : class, ISaveable;
@@ -29,7 +31,9 @@ namespace RDP.SaveLoadSystem
 	public interface IReferenceLoader
 	{
 		bool LoadValue<T>(string key, out T value) where T : IConvertible, IComparable;
+		bool LoadValues<T>(string key, out T[] values) where T : IConvertible, IComparable;
 		bool LoadStruct<T>(string key, out T value) where T : struct;
+		bool LoadStructs<T>(string key, out T[] values) where T : struct;
 		bool LoadDict<T, U>(string key, out Dictionary<T, U> value);
 		bool LoadRef<T>(string key, StorageLoadHandler<T> refAvailableCallback) where T : class, ISaveable;
 		bool LoadRefs<T>(string key, StorageLoadMultipleHandler<T> refsAvailableCallback) where T : class, ISaveable;

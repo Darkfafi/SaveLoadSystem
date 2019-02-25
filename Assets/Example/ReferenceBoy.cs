@@ -1,14 +1,16 @@
 ﻿using RDP.SaveLoadSystem;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace RPD.SaveLoadSystem.Example
 {
-	public class ReferenceBoy : IRefereceSaveable
+	public class ReferenceBoy : ISaveableLoad
 	{
 		public string BoyName;
 		private ReferenceBoy _referenceBoy;
 		private int _count = 0;
 		private Vector2 _vecCool = new Vector2(1, 1);
+		private List<Vector2> _vecs = new List<Vector2>();
 
 		public ReferenceBoy RefKid
 		{
@@ -54,6 +56,7 @@ namespace RPD.SaveLoadSystem.Example
 			saver.SaveValue("count", _count);
 			saver.SaveStruct("vec", _vecCool);
 			saver.SaveRef("ref", _referenceBoy, true);
+			saver.SaveStructs("vecs", _vecs.ToArray());
 		}
 
 		public void Load(IReferenceLoader loader)
@@ -65,10 +68,16 @@ namespace RPD.SaveLoadSystem.Example
 			{
 				_referenceBoy = instance;
 			});
+			Vector2[] loadedVecs;
+			loader.LoadStructs("vecs", out loadedVecs);
+			_vecs.AddRange(loadedVecs);
 		}
 
 		public void LoadingCompleted()
 		{
+			if(_vecs.Count == 0)
+				_vecs.Add(new Vector2(33, 33));
+
 			Debug.Log(ToString());
 		}
 

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace RDP.SaveLoadSystem.Internal.Utils
 {
@@ -34,7 +33,7 @@ namespace RDP.SaveLoadSystem.Internal.Utils
 
 			for(int i = 0; i < saveableDict.Items.Length; i++)
 			{
-				dict.Add((T)saveableDict.Items[i].GetKey(), (U)saveableDict.Items[i].GetValue());
+				dict.Add((T)saveableDict.Items[i].KeySection.GetValue(), (U)saveableDict.Items[i].ValueSection.GetValue());
 			}
 
 			return dict;
@@ -44,27 +43,13 @@ namespace RDP.SaveLoadSystem.Internal.Utils
 	[Serializable]
 	public struct DictItem
 	{
-		public string SectionKeyString;
-		public string SectionValueString;
-		public string KeyType;
-		public string ValueType;
+		public SaveableValueSection KeySection;
+		public SaveableValueSection ValueSection;
 
 		public DictItem(object key, object value)
 		{
-			SectionKeyString = PrimitiveToValueParserUtility.ToJSON(key);
-			SectionValueString = PrimitiveToValueParserUtility.ToJSON(value);
-			KeyType = key.GetType().AssemblyQualifiedName;
-			ValueType = value.GetType().AssemblyQualifiedName;
-		}
-
-		public object GetValue()
-		{
-			return PrimitiveToValueParserUtility.FromJSON(SectionValueString, Type.GetType(ValueType));
-		}
-
-		public object GetKey()
-		{
-			return PrimitiveToValueParserUtility.FromJSON(SectionKeyString, Type.GetType(KeyType));
+			KeySection = new SaveableValueSection(key);
+			ValueSection = new SaveableValueSection(value);
 		}
 	}
 }

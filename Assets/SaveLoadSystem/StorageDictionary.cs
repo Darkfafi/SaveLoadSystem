@@ -37,12 +37,34 @@ namespace RDP.SaveLoadSystem
 
 		public void SaveValue<T>(string key, T value) where T : IConvertible, IComparable
 		{
+			ThrowExceptionWhenISaveable("It is forbidden use this method to save an `ISaveable`! Use `SaveRef` instead!", typeof(T));
 			Save(key, value);
+		}
+
+		public void SaveValues<T>(string key, T[] values) where T : IConvertible, IComparable
+		{
+			ThrowExceptionWhenISaveable("It is forbidden use this method to save an `ISaveable`! Use `SaveRefs` instead!", typeof(T));
+			SaveStruct(key, SaveableArray<T>.From(values));
 		}
 
 		public bool LoadValue<T>(string key, out T value) where T : IConvertible, IComparable
 		{
+			ThrowExceptionWhenISaveable("It is forbidden use this method to load an `ISaveable`! Use `LoadRef` instead!", typeof(T));
 			return Load(key, out value);
+		}
+
+		public bool LoadValues<T>(string key, out T[] values) where T : IConvertible, IComparable
+		{
+			ThrowExceptionWhenISaveable("It is forbidden use this method to load an `ISaveable`! Use `LoadRefs` instead!", typeof(T));
+			SaveableArray<T> saveableArray;
+			if(LoadStruct(key, out saveableArray))
+			{
+				values = SaveableArray<T>.To(saveableArray);
+				return true;
+			}
+
+			values = null;
+			return false;
 		}
 
 		public void SaveStruct<T>(string key, T value) where T : struct
@@ -50,18 +72,38 @@ namespace RDP.SaveLoadSystem
 			Save(key, value);
 		}
 
+		public void SaveStructs<T>(string key, T[] values) where T : struct
+		{
+			SaveStruct(key, SaveableArray<T>.From(values));
+		}
+
 		public bool LoadStruct<T>(string key, out T value) where T : struct
 		{
 			return Load(key, out value);
 		}
 
+		public bool LoadStructs<T>(string key, out T[] values) where T : struct
+		{
+			SaveableArray<T> saveableArray;
+			if(LoadStruct(key, out saveableArray))
+			{
+				values = SaveableArray<T>.To(saveableArray);
+				return true;
+			}
+
+			values = null;
+			return false;
+		}
+
 		public void SaveDict<T, U>(string key, Dictionary<T, U> value)
 		{
+			ThrowExceptionWhenISaveable("It is forbidden to save a dictionary containing an `ISaveable`!", typeof(T), typeof(U));
 			SaveStruct(key, SaveableDict<T, U>.From(value));
 		}
 
 		public bool LoadDict<T, U>(string key, out Dictionary<T, U> value)
 		{
+			ThrowExceptionWhenISaveable("It is forbidden to load a dictionary containing an `ISaveable`!", typeof(T), typeof(U));
 			SaveableDict<T, U> saveableDict;
 			if(LoadStruct(key, out saveableDict))
 			{
@@ -206,6 +248,19 @@ namespace RDP.SaveLoadSystem
 			}
 
 			return false;
+		}
+
+		private void ThrowExceptionWhenISaveable(string message, params Type[] typesToCheck)
+		{
+			Type iSaveableType = typeof(ISaveable);
+
+			for(int i = 0; i < typesToCheck.Length; i++)
+			{
+				if(iSaveableType.IsAssignableFrom(typesToCheck[i]))
+				{
+					throw new Exception(message);
+				}
+			}
 		}
 	}
 }

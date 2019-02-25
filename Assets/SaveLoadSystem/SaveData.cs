@@ -31,19 +31,12 @@ namespace RDP.SaveLoadSystem.Internal
 	public struct SaveDataItem
 	{
 		public string SectionKey;
-		public string SectionValueString;
-		public string ValueType;
+		public SaveableValueSection ValueSection;
 
 		public SaveDataItem(string key, object value)
 		{
 			SectionKey = key;
-			ValueType = value.GetType().AssemblyQualifiedName;
-			SectionValueString = PrimitiveToValueParserUtility.ToJSON(value);
-		}
-
-		public object GetValue()
-		{
-			return PrimitiveToValueParserUtility.FromJSON(SectionValueString, Type.GetType(ValueType));
+			ValueSection = new SaveableValueSection(value);
 		}
 
 		public static Dictionary<string, object> ToDictionary(SaveDataItem[] itemsCollection)
@@ -52,7 +45,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 			for(int i = 0, c = itemsCollection.Length; i < c; i++)
 			{
-				returnValue.Add(itemsCollection[i].SectionKey, itemsCollection[i].GetValue());
+				returnValue.Add(itemsCollection[i].SectionKey, itemsCollection[i].ValueSection.GetValue());
 			}
 
 			return returnValue;
