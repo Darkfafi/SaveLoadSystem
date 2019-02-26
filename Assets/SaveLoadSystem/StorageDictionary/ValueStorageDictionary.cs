@@ -128,6 +128,16 @@ namespace RDP.SaveLoadSystem
 			return false;
 		}
 
+		public object ReadKey(string key)
+		{
+			object readValue;
+			if(_keyToNormalValue.TryGetValue(key, out readValue))
+			{
+				return readValue;
+			}
+			return null;
+		}
+
 		public void RemoveKey(string key)
 		{
 			if(HasKey(key))

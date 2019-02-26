@@ -10,8 +10,6 @@ namespace RDP.SaveLoadSystem
 {
 	public class Storage
 	{
-		public delegate bool StorageComparisonHandler(Type referenceType, ValueStorageDictionary storageOfReference);
-
 		public enum EncodingType
 		{
 			None,
@@ -71,7 +69,6 @@ namespace RDP.SaveLoadSystem
 							{
 								storage = capsuleToStorage.Value[id];
 							}
-
 
 							storage.HandlingRefs(refHandler);
 
@@ -167,14 +164,23 @@ namespace RDP.SaveLoadSystem
 				Flush(storageCapsuleIDs);
 		}
 
-		public ValueStorageDictionary[] Read(params string[] storageCapsuleIDs)
+		public bool TryRead(string storageCapsuleID, out ReadStorageResult readStorageResult)
 		{
-			return Read(null, storageCapsuleIDs);
+			List<ReadStorageResult> storages = Read(new string[] { storageCapsuleID });
+
+			if(storages.Count > 0)
+			{
+				readStorageResult = storages[0];
+				return true;
+			}
+
+			readStorageResult = default(ReadStorageResult);
+			return false;
 		}
 
-		public ValueStorageDictionary[] Read(StorageComparisonHandler comparison, params string[] storageCapsuleIDs)
+		public List<ReadStorageResult> Read(params string[] storageCapsuleIDs)
 		{
-			List<ValueStorageDictionary> storagesToReturn = new List<ValueStorageDictionary>();
+			List<ReadStorageResult> storageDicts = new List<ReadStorageResult>();
 
 			foreach(var capsuleToStorage in _cachedStorageCapsules)
 			{
@@ -185,29 +191,26 @@ namespace RDP.SaveLoadSystem
 						RefreshCachedData(capsuleToStorage.Key);
 					}
 
-					foreach(var storageItem in capsuleToStorage.Value)
+					StorageDictionary capsuleStorage = null;
+					List<KeyValuePair<Type, ValueStorageDictionary>> refStorages = new List<KeyValuePair<Type, ValueStorageDictionary>>();
+					if(capsuleToStorage.Value.TryGetValue(ROOT_SAVE_DATA_CAPSULE_ID, out capsuleStorage))
 					{
-						if(comparison != null)
+						foreach(var storageItem in capsuleToStorage.Value)
 						{
 							string referenceTypeString;
 							if(storageItem.Value.LoadValue(KEY_REFERENCE_TYPE_STRING, out referenceTypeString))
 							{
 								Type referenceType = Type.GetType(referenceTypeString);
-								if(comparison(referenceType, storageItem.Value))
-								{
-									storagesToReturn.Add(storageItem.Value);
-								}
+								refStorages.Add(new KeyValuePair<Type, ValueStorageDictionary>(referenceType, storageItem.Value));
 							}
 						}
-						else
-						{
-							storagesToReturn.Add(storageItem.Value);
-						}
+
+						storageDicts.Add(new ReadStorageResult(capsuleToStorage.Key.ID, capsuleStorage, refStorages));
 					}
 				}
 			}
 
-			return storagesToReturn.ToArray();
+			return storageDicts;
 		}
 
 		public void Clear(bool removeSaveFiles, params string[] storageCapsuleIDs)
@@ -396,6 +399,20 @@ namespace RDP.SaveLoadSystem
 		string ID
 		{
 			get;
+		}
+	}
+
+	public struct ReadStorageResult
+	{
+		public string CapsuleID;
+		public ValueStorageDictionary CapsuleStorage;
+		public List<KeyValuePair<Type, ValueStorageDictionary>> SavedRefsStorage;
+
+		public ReadStorageResult(string capsuleID, ValueStorageDictionary capsuleStorage, List<KeyValuePair<Type, ValueStorageDictionary>> savedRefsStorage)
+		{
+			CapsuleID = capsuleID;
+			CapsuleStorage = capsuleStorage;
+			SavedRefsStorage = savedRefsStorage;
 		}
 	}
 }
