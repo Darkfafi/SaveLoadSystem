@@ -46,13 +46,13 @@ namespace RPD.SaveLoadSystem.Example
 				_storage.FlushClear(RemoveFileOnClear, EXAMPLE_CAPSULE);
 		}
 
-		public void Save(IReferenceSaver saver)
+		public void Save(IStorageSaver saver)
 		{
 			saver.SaveRef("RefA", _referenceBoyA);
 			saver.SaveRef("RefB", _referenceBoyB);
 		}
 
-		public void Load(IReferenceLoader loader)
+		public void Load(IStorageLoader loader)
 		{
 			loader.LoadRef<ReferenceBoy>("RefA", (instance) => _referenceBoyA = instance);
 			loader.LoadRef<ReferenceBoy>("RefB", (instance) => _referenceBoyB = instance);

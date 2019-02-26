@@ -50,7 +50,7 @@ namespace RPD.SaveLoadSystem.Example
 			_referenceBoy = new ReferenceBoy("Reference Inner");
 		}
 
-		public void Save(IReferenceSaver saver)
+		public void Save(IStorageSaver saver)
 		{
 			saver.SaveValue("name", BoyName);
 			saver.SaveValue("count", _count);
@@ -59,7 +59,7 @@ namespace RPD.SaveLoadSystem.Example
 			saver.SaveStructs("vecs", _vecs.ToArray());
 		}
 
-		public void Load(IReferenceLoader loader)
+		public void Load(IStorageLoader loader)
 		{
 			loader.LoadValue("name", out BoyName);
 			loader.LoadValue("count", out _count);

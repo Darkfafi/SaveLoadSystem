@@ -6,33 +6,18 @@ using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
-	public class StorageDictionary : IReferenceSaver, IReferenceLoader
+	public class ValueStorageDictionary : IStorageValueSaver, IStorageValueLoader
 	{
 		private Dictionary<string, object> _keyToNormalValue;
-		private Dictionary<string, object> _keyToReferenceID;
 
-		private SaveableReferenceIdHandler _refHandler;
-
-		public StorageDictionary()
+		public ValueStorageDictionary()
 		{
 			_keyToNormalValue = new Dictionary<string, object>();
-			_keyToReferenceID = new Dictionary<string, object>();
 		}
 
-		public StorageDictionary(Dictionary<string, object> loadedValues, Dictionary<string, object> loadedRefs)
+		public ValueStorageDictionary(Dictionary<string, object> loadedValues)
 		{
 			_keyToNormalValue = loadedValues;
-			_keyToReferenceID = loadedRefs;
-		}
-
-		public void Using(SaveableReferenceIdHandler refHandler)
-		{
-			_refHandler = refHandler;
-		}
-
-		public void StopUsing()
-		{
-			_refHandler = null;
 		}
 
 		public void SaveValue<T>(string key, T value) where T : IConvertible, IComparable
@@ -143,112 +128,48 @@ namespace RDP.SaveLoadSystem
 			return false;
 		}
 
-		void IReferenceSaver.SaveRef<T>(string key, T value, bool allowNull)
+		public void RemoveKey(string key)
 		{
-			if(value == null)
+			if(HasKey(key))
 			{
-				if(!allowNull)
-					Debug.LogErrorFormat("Cannot add {0} due to the value being `null`", key);
-				return;
+				_keyToNormalValue.Remove(key);
 			}
-
-			_keyToReferenceID.Add(key, _refHandler.GetIdForReference(value));
 		}
 
-		void IReferenceSaver.SaveRefs<T>(string key, T[] values, bool allowNull)
+		public bool HasKey(string key)
 		{
-			List<T> valuesList = new List<T>(values);
-			valuesList.RemoveAll((v) => v == null);
-			values = valuesList.ToArray();
+			return _keyToNormalValue.ContainsKey(key);
+		}
 
-			if(values == null)
+		public void ReplaceKeyValue(string key, object newValue)
+		{
+			if(HasKey(key))
 			{
-				if(!allowNull)
-					Debug.LogErrorFormat("Cannot add {0} due to the value being `null`", key);
-				return;
+				_keyToNormalValue[key] = newValue;
 			}
+		}
 
-			string idsCollection = "";
-			for(int i = 0, c = values.Length; i < c; i++)
+		public void RelocateKeyValue(string currentKey, string newKey)
+		{
+			object value;
+			if(_keyToNormalValue.TryGetValue(currentKey, out value))
 			{
-				idsCollection += _refHandler.GetIdForReference(values[i]);
-				if(i < c - 1)
+				_keyToNormalValue.Remove(currentKey);
+				if(HasKey(newKey))
 				{
-					idsCollection += ",";
-				}
-			}
-
-			_keyToReferenceID.Add(key, idsCollection);
-		}
-
-		bool IReferenceLoader.LoadRef<T>(string key, StorageLoadHandler<T> refLoadedCallback)
-		{
-			object refIDObject;
-
-			if(!_keyToReferenceID.TryGetValue(key, out refIDObject))
-			{
-				refLoadedCallback(null);
-				return false;
-			}
-
-			string refId = refIDObject.ToString();
-
-			_refHandler.GetReferenceFromID(refId, (trueReferenceLoad, reference) =>
-			{
-				if(trueReferenceLoad)
-					trueReferenceLoad = reference == null || reference.GetType().IsAssignableFrom(typeof(T)) && _keyToReferenceID.ContainsKey(key);
-
-				if(trueReferenceLoad)
-					refLoadedCallback((T)reference);
-				else
-					refLoadedCallback(default(T));
-			});
-
-			return true;
-		}
-
-		bool IReferenceLoader.LoadRefs<T>(string key, StorageLoadMultipleHandler<T> refLoadedCallback)
-		{
-			object refIDsObject;
-
-			if(!_keyToReferenceID.TryGetValue(key, out refIDsObject))
-			{
-				refLoadedCallback(new T[] { });
-				return false;
-			}
-
-			string[] refIds = refIDsObject.ToString().Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-			_refHandler.GetReferencesFromID(key, refIds, (references) =>
-			{
-				if(references != null)
-				{
-					Array castedReferencesArray = Array.CreateInstance(typeof(T), references.Length);
-					Array.Copy(references, castedReferencesArray, references.Length);
-					refLoadedCallback((T[])castedReferencesArray);
+					_keyToNormalValue[newKey] = value;
 				}
 				else
-					refLoadedCallback(new T[] { });
-			});
-
-			return true;
+				{
+					_keyToNormalValue.Add(newKey, value);
+				}
+			}
 		}
 
 		public SaveDataItem[] GetValueDataItems()
 		{
 			List<SaveDataItem> items = new List<SaveDataItem>();
 			foreach(var pair in _keyToNormalValue)
-			{
-				items.Add(new SaveDataItem(pair.Key, pair.Value));
-			}
-
-			return items.ToArray();
-		}
-
-		public SaveDataItem[] GetReferenceDataItems()
-		{
-			List<SaveDataItem> items = new List<SaveDataItem>();
-			foreach(var pair in _keyToReferenceID)
 			{
 				items.Add(new SaveDataItem(pair.Key, pair.Value));
 			}

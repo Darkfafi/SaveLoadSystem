@@ -71,7 +71,7 @@ namespace RDP.SaveLoadSystem
 							}
 
 
-							storage.Using(refHandler);
+							storage.HandlingRefs(refHandler);
 
 							if(id == ROOT_SAVE_DATA_CAPSULE_ID)
 							{
@@ -79,7 +79,7 @@ namespace RDP.SaveLoadSystem
 							}
 							else if(storage.LoadValue(KEY_REFERENCE_TYPE_STRING, out classTypeFullName))
 							{
-								IReferenceLoader loader = storage;
+								IStorageLoader loader = storage;
 								Type referenceType = Type.GetType(classTypeFullName);
 								bool methodLoadInterface = typeof(ISaveableLoad).IsAssignableFrom(referenceType);
 								ISaveable referenceInstance = (methodLoadInterface ? Activator.CreateInstance(referenceType) : Activator.CreateInstance(referenceType, loader)) as ISaveable;
@@ -95,7 +95,7 @@ namespace RDP.SaveLoadSystem
 								Debug.LogErrorFormat("UNABLE TO LOAD REFERENCE ID {0}'s CLASS TYPE NAME", id);
 							}
 
-							storage.StopUsing();
+							storage.StopHandlingRefs();
 						};
 
 						refHandler.ReferenceRequestedEvent += referenceRequestedEventAction;
@@ -133,21 +133,21 @@ namespace RDP.SaveLoadSystem
 							if(!referencesSaved.ContainsKey(refID))
 							{
 								StorageDictionary storageDictForRef = new StorageDictionary();
-								storageDictForRef.Using(refHandler);
+								storageDictForRef.HandlingRefs(refHandler);
 								referencesSaved.Add(refID, storageDictForRef);
 								storageDictForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceInstance.GetType().AssemblyQualifiedName);
 								referenceInstance.Save(storageDictForRef);
-								storageDictForRef.StopUsing();
+								storageDictForRef.StopHandlingRefs();
 							}
 						};
 
 						refHandler.IdForReferenceCreatedEvent += refDetectedAction;
 
 						StorageDictionary entryStorage = new StorageDictionary();
-						entryStorage.Using(refHandler);
+						entryStorage.HandlingRefs(refHandler);
 						referencesSaved.Add(ROOT_SAVE_DATA_CAPSULE_ID, entryStorage);
 						pair.Key.Save(entryStorage);
-						entryStorage.StopUsing();
+						entryStorage.StopHandlingRefs();
 
 						refHandler.IdForReferenceCreatedEvent -= refDetectedAction;
 
