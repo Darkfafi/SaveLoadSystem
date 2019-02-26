@@ -10,6 +10,8 @@ namespace RDP.SaveLoadSystem
 {
 	public class Storage
 	{
+		public delegate bool StorageComparisonHandler(Type referenceType, ValueStorageDictionary storageOfReference);
+
 		public enum EncodingType
 		{
 			None,
@@ -163,6 +165,49 @@ namespace RDP.SaveLoadSystem
 
 			if(flushAfterSave)
 				Flush(storageCapsuleIDs);
+		}
+
+		public ValueStorageDictionary[] Read(params string[] storageCapsuleIDs)
+		{
+			return Read(null, storageCapsuleIDs);
+		}
+
+		public ValueStorageDictionary[] Read(StorageComparisonHandler comparison, params string[] storageCapsuleIDs)
+		{
+			List<ValueStorageDictionary> storagesToReturn = new List<ValueStorageDictionary>();
+
+			foreach(var capsuleToStorage in _cachedStorageCapsules)
+			{
+				if(storageCapsuleIDs == null || storageCapsuleIDs.Length == 0 || Array.IndexOf(storageCapsuleIDs, capsuleToStorage.Key.ID) >= 0)
+				{
+					if(capsuleToStorage.Value == null)
+					{
+						RefreshCachedData(capsuleToStorage.Key);
+					}
+
+					foreach(var storageItem in capsuleToStorage.Value)
+					{
+						if(comparison != null)
+						{
+							string referenceTypeString;
+							if(storageItem.Value.LoadValue(KEY_REFERENCE_TYPE_STRING, out referenceTypeString))
+							{
+								Type referenceType = Type.GetType(referenceTypeString);
+								if(comparison(referenceType, storageItem.Value))
+								{
+									storagesToReturn.Add(storageItem.Value);
+								}
+							}
+						}
+						else
+						{
+							storagesToReturn.Add(storageItem.Value);
+						}
+					}
+				}
+			}
+
+			return storagesToReturn.ToArray();
 		}
 
 		public void FlushClear(bool removeSaveFiles, params string[] storageCapsuleIDs)
