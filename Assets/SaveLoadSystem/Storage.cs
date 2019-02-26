@@ -210,7 +210,7 @@ namespace RDP.SaveLoadSystem
 			return storagesToReturn.ToArray();
 		}
 
-		public void FlushClear(bool removeSaveFiles, params string[] storageCapsuleIDs)
+		public void Clear(bool removeSaveFiles, params string[] storageCapsuleIDs)
 		{
 			Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> buffer = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
 			foreach(var pair in _cachedStorageCapsules)

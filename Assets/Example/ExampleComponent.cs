@@ -43,7 +43,7 @@ namespace RPD.SaveLoadSystem.Example
 			if(!ClearSavesAtOnDestroy)
 				_storage.Save(true, EXAMPLE_CAPSULE); // Can be left empty to save all given capsules.
 			else
-				_storage.FlushClear(RemoveFileOnClear, EXAMPLE_CAPSULE);
+				_storage.Clear(RemoveFileOnClear, EXAMPLE_CAPSULE);
 		}
 
 		public void Save(IStorageSaver saver)
