@@ -16,8 +16,8 @@ namespace RDP.SaveLoadSystem
 			Base64,
 		}
 
-		public const string ROOT_SAVE_DATA_CAPSULE_ID = "ID_CAPSULE_SAVE_DATA";
-		public const string KEY_REFERENCE_TYPE_STRING = "RESERVED_REFERENCE_TYPE_FULL_NAME_STRING_RESERVED";
+		public const string ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID = "ID_CAPSULE_SAVE_DATA";
+		public const string STORAGE_REFERENCE_TYPE_STRING_KEY = "RESERVED_REFERENCE_TYPE_FULL_NAME_STRING_RESERVED";
 		public const string SAVE_FILE_EXTENSION = "rdpsf";
 
 		public SaveableReferenceIdHandler ActiveRefHandler
@@ -79,12 +79,12 @@ namespace RDP.SaveLoadSystem
 							storage = new StorageDictionary(capsuleToStorage.Key.ID, this);
 						}
 
-						if(id == ROOT_SAVE_DATA_CAPSULE_ID)
+						if(id == ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID)
 						{
 							capsuleToStorage.Key.Load(storage);
 							_allLoadedReferences.Add(capsuleToStorage.Key);
 						}
-						else if(storage.LoadValue(KEY_REFERENCE_TYPE_STRING, out classTypeFullName))
+						else if(storage.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out classTypeFullName))
 						{
 							IStorageLoader loader = storage;
 							Type referenceType = Type.GetType(classTypeFullName);
@@ -104,7 +104,7 @@ namespace RDP.SaveLoadSystem
 					};
 
 					ActiveRefHandler.ReferenceRequestedEvent += referenceRequestedEventAction;
-					referenceRequestedEventAction(ROOT_SAVE_DATA_CAPSULE_ID);
+					referenceRequestedEventAction(ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID);
 					ActiveRefHandler.LoadRemainingAsNull();
 					ActiveRefHandler.ReferenceRequestedEvent -= referenceRequestedEventAction;
 
@@ -144,16 +144,16 @@ namespace RDP.SaveLoadSystem
 						{
 							StorageDictionary storageDictForRef = new StorageDictionary(pair.Key.ID, this);
 							referencesSaved.Add(refID, storageDictForRef);
-							storageDictForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceInstance.GetType().AssemblyQualifiedName);
+							storageDictForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceInstance.GetType().AssemblyQualifiedName);
 							referenceInstance.Save(storageDictForRef);
 
-							if(refID != ROOT_SAVE_DATA_CAPSULE_ID)
+							if(refID != ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID)
 								_alreadySavedReferencesToOriginCapsuleMap.Add(refID, pair.Key);
 						}
 					};
 
 					ActiveRefHandler.IdForReferenceRequestedEvent += refDetectedAction;
-					refDetectedAction(ROOT_SAVE_DATA_CAPSULE_ID, pair.Key);
+					refDetectedAction(ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID, pair.Key);
 					ActiveRefHandler.IdForReferenceRequestedEvent -= refDetectedAction;
 
 					buffer.Add(pair.Key, referencesSaved);
@@ -198,12 +198,12 @@ namespace RDP.SaveLoadSystem
 
 					StorageDictionary capsuleStorage = null;
 					List<KeyValuePair<Type, IStorageDictionaryEditor>> refStorages = new List<KeyValuePair<Type, IStorageDictionaryEditor>>();
-					if(capsuleToStorage.Value.TryGetValue(ROOT_SAVE_DATA_CAPSULE_ID, out capsuleStorage))
+					if(capsuleToStorage.Value.TryGetValue(ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID, out capsuleStorage))
 					{
 						foreach(var storageItem in capsuleToStorage.Value)
 						{
 							string referenceTypeString;
-							if(storageItem.Key != ROOT_SAVE_DATA_CAPSULE_ID && storageItem.Value.LoadValue(KEY_REFERENCE_TYPE_STRING, out referenceTypeString))
+							if(storageItem.Key != ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID && storageItem.Value.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out referenceTypeString))
 							{
 								Type referenceType = Type.GetType(referenceTypeString);
 								refStorages.Add(new KeyValuePair<Type, IStorageDictionaryEditor>(referenceType, storageItem.Value));
@@ -408,7 +408,7 @@ namespace RDP.SaveLoadSystem
 					if(item.Value.TryGetValue(refID, out storageForRef))
 					{
 						string referenceTypeString;
-						if(storageForRef.LoadValue(KEY_REFERENCE_TYPE_STRING, out referenceTypeString))
+						if(storageForRef.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out referenceTypeString))
 						{
 							Type refType = Type.GetType(referenceTypeString);
 							return new EditableRefValue(refID, refType, storageForRef);
@@ -431,7 +431,7 @@ namespace RDP.SaveLoadSystem
 				if(item.Key.ID == storageCapsuleID)
 				{
 					StorageDictionary storageForRef = new StorageDictionary(storageCapsuleID, this);
-					storageForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceType.AssemblyQualifiedName);
+					storageForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceType.AssemblyQualifiedName);
 					string randomOnFlyID = Guid.NewGuid().ToString("N");
 					editableRefValue = new EditableRefValue(randomOnFlyID, referenceType, storageForRef);
 					capsuleToEdit = item.Key;
