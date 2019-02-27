@@ -125,6 +125,7 @@ namespace RDP.SaveLoadSystem
 		public void Save(bool flushAfterSave, params string[] storageCapsuleIDs)
 		{
 			Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> buffer = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
+			Dictionary<string, IStorageCapsule> _alreadySavedReferencesToOriginCapsuleMap = new Dictionary<string, IStorageCapsule>();
 			using(ActiveRefHandler = new SaveableReferenceIdHandler())
 			{
 				foreach(var pair in _cachedStorageCapsules)
@@ -135,18 +136,30 @@ namespace RDP.SaveLoadSystem
 
 						Action<string, ISaveable> refDetectedAction = (refID, referenceInstance) =>
 						{
+							IStorageCapsule holdingCapsule;
+							if(_alreadySavedReferencesToOriginCapsuleMap.TryGetValue(refID, out holdingCapsule))
+							{
+								if(holdingCapsule != pair.Key)
+								{
+									throw new Exception(string.Format("Save aborted! Reference {0} saved in capsule {1} while capsule {2} is saving it now! Each capsule should not be saving cross references!", referenceInstance.ToString(), holdingCapsule.ID, pair.Key.ID));
+								}
+							}
+
 							if(!referencesSaved.ContainsKey(refID))
 							{
 								StorageDictionary storageDictForRef = new StorageDictionary(pair.Key.ID, this);
 								referencesSaved.Add(refID, storageDictForRef);
 								storageDictForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceInstance.GetType().AssemblyQualifiedName);
 								referenceInstance.Save(storageDictForRef);
+
+								if(refID != ROOT_SAVE_DATA_CAPSULE_ID)
+									_alreadySavedReferencesToOriginCapsuleMap.Add(refID, pair.Key);
 							}
 						};
 
-						ActiveRefHandler.IdForReferenceCreatedEvent += refDetectedAction;
+						ActiveRefHandler.IdForReferenceRequestedEvent += refDetectedAction;
 						refDetectedAction(ROOT_SAVE_DATA_CAPSULE_ID, pair.Key);
-						ActiveRefHandler.IdForReferenceCreatedEvent -= refDetectedAction;
+						ActiveRefHandler.IdForReferenceRequestedEvent -= refDetectedAction;
 
 						buffer.Add(pair.Key, referencesSaved);
 					}

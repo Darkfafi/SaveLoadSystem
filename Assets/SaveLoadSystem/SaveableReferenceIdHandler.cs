@@ -8,7 +8,7 @@ namespace RDP.SaveLoadSystem
 		public delegate void StorageLoadHandler(bool wasInStorage, ISaveable instance);
 		public delegate void StorageLoadMultipleHandler(ISaveable[] instances);
 
-		public event Action<string, ISaveable> IdForReferenceCreatedEvent;
+		public event Action<string, ISaveable> IdForReferenceRequestedEvent;
 		public event Action<string> ReferenceRequestedEvent;
 
 		private Dictionary<ISaveable, string> _refToIdMap = new Dictionary<ISaveable, string>();
@@ -25,10 +25,10 @@ namespace RDP.SaveLoadSystem
 				refID = _refCounter.ToString();
 				_refToIdMap.Add(reference, refID);
 				_refCounter++;
-
-				if(IdForReferenceCreatedEvent != null)
-					IdForReferenceCreatedEvent(refID, reference);
 			}
+
+			if(IdForReferenceRequestedEvent != null)
+				IdForReferenceRequestedEvent(refID, reference);
 
 			return refID;
 		}
@@ -136,7 +136,7 @@ namespace RDP.SaveLoadSystem
 			_idToRefMap = null;
 			_refReadyActions = null;
 
-			IdForReferenceCreatedEvent = null;
+			IdForReferenceRequestedEvent = null;
 			ReferenceRequestedEvent = null;
 
 			_refCounter = 0L;
