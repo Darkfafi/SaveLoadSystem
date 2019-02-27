@@ -2,20 +2,24 @@
 using RDP.SaveLoadSystem.Internal.Utils;
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
-	public class ValueStorageDictionary : IStorageValueSaver, IStorageValueLoader
+	public class ValueStorageDictionary : IStorageValueSaver, IStorageValueLoader, IValueStorageDictionaryEditor
 	{
+		public string ParentStorageCapsuleID
+		{
+			get; private set;
+		}
+
 		private Dictionary<string, object> _keyToNormalValue;
 
-		public ValueStorageDictionary()
+		public ValueStorageDictionary(string parentStorageCapsuleID)
 		{
 			_keyToNormalValue = new Dictionary<string, object>();
 		}
 
-		public ValueStorageDictionary(Dictionary<string, object> loadedValues)
+		public ValueStorageDictionary(string parentStorageCapsuleID, Dictionary<string, object> loadedValues)
 		{
 			_keyToNormalValue = loadedValues;
 		}
@@ -128,7 +132,19 @@ namespace RDP.SaveLoadSystem
 			return false;
 		}
 
-		public object ReadKey(string key)
+		public void SetValue(string key, object value)
+		{
+			if(_keyToNormalValue.ContainsKey(key))
+			{
+				_keyToNormalValue[key] = value;
+			}
+			else
+			{
+				_keyToNormalValue.Add(key, value);
+			}
+		}
+
+		public object GetValue(string key)
 		{
 			object readValue;
 			if(_keyToNormalValue.TryGetValue(key, out readValue))
@@ -138,41 +154,18 @@ namespace RDP.SaveLoadSystem
 			return null;
 		}
 
-		public void RemoveKey(string key)
+		public void RemoveValue(string key)
 		{
-			if(HasKey(key))
-			{
-				_keyToNormalValue.Remove(key);
-			}
+			_keyToNormalValue.Remove(key);
 		}
 
-		public bool HasKey(string key)
-		{
-			return _keyToNormalValue.ContainsKey(key);
-		}
-
-		public void ReplaceKeyValue(string key, object newValue)
-		{
-			if(HasKey(key))
-			{
-				_keyToNormalValue[key] = newValue;
-			}
-		}
-
-		public void RelocateKeyValue(string currentKey, string newKey)
+		public void RelocateValue(string currentKey, string newKey)
 		{
 			object value;
 			if(_keyToNormalValue.TryGetValue(currentKey, out value))
 			{
 				_keyToNormalValue.Remove(currentKey);
-				if(HasKey(newKey))
-				{
-					_keyToNormalValue[newKey] = value;
-				}
-				else
-				{
-					_keyToNormalValue.Add(newKey, value);
-				}
+				SetValue(newKey, value);
 			}
 		}
 

@@ -5,32 +5,21 @@ using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
-	public class StorageDictionary : ValueStorageDictionary, IStorageSaver, IStorageLoader
+	public class StorageDictionary : ValueStorageDictionary, IStorageSaver, IStorageLoader, IStorageDictionaryEditor
 	{
 		private Dictionary<string, object> _keyToReferenceID;
-		private SaveableReferenceIdHandler _refHandler;
+		private IEditableStorageAccess _storageAccess;
 
-		public StorageDictionary() : base()
+		public StorageDictionary(string parentStorageCapsuleID, IEditableStorageAccess storageAccess) : base(parentStorageCapsuleID)
 		{
+			_storageAccess = storageAccess;
 			_keyToReferenceID = new Dictionary<string, object>();
 		}
 
-		public StorageDictionary(Dictionary<string, object> loadedValues, Dictionary<string, object> loadedRefs) : base(loadedValues)
+		public StorageDictionary(string parentStorageCapsuleID, IEditableStorageAccess storageAccess, Dictionary<string, object> loadedValues, Dictionary<string, object> loadedRefs) : base(parentStorageCapsuleID, loadedValues)
 		{
+			_storageAccess = storageAccess;
 			_keyToReferenceID = loadedRefs;
-		}
-
-		public void HandlingRefs(SaveableReferenceIdHandler refHandler)
-		{
-			if(_refHandler == null)
-			{
-				_refHandler = refHandler;
-				_refHandler.ListenToEndUse(EndUseHandler);
-			}
-			else
-			{
-				throw new Exception("Can't start HandlingRefs for a refHandler has already been assigned. Please dispose the first assigned handler before assigning a new one!");
-			}
 		}
 
 		void IStorageReferenceSaver.SaveRef<T>(string key, T value, bool allowNull)
@@ -42,7 +31,7 @@ namespace RDP.SaveLoadSystem
 				return;
 			}
 
-			_keyToReferenceID.Add(key, _refHandler.GetIdForReference(value));
+			_keyToReferenceID.Add(key, _storageAccess.ActiveRefHandler.GetIdForReference(value));
 		}
 
 		void IStorageReferenceSaver.SaveRefs<T>(string key, T[] values, bool allowNull)
@@ -61,7 +50,7 @@ namespace RDP.SaveLoadSystem
 			string idsCollection = "";
 			for(int i = 0, c = values.Length; i < c; i++)
 			{
-				idsCollection += _refHandler.GetIdForReference(values[i]);
+				idsCollection += _storageAccess.ActiveRefHandler.GetIdForReference(values[i]);
 				if(i < c - 1)
 				{
 					idsCollection += ",";
@@ -81,7 +70,7 @@ namespace RDP.SaveLoadSystem
 				return false;
 			}
 
-			_refHandler.GetReferenceFromID(refId, (trueReferenceLoad, reference) =>
+			_storageAccess.ActiveRefHandler.GetReferenceFromID(refId, (trueReferenceLoad, reference) =>
 			{
 				if(trueReferenceLoad)
 					trueReferenceLoad = reference == null || reference.GetType().IsAssignableFrom(typeof(T)) && _keyToReferenceID.ContainsKey(key);
@@ -107,7 +96,7 @@ namespace RDP.SaveLoadSystem
 
 			string[] refIds = refIDsObject.ToString().Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
-			_refHandler.GetReferencesFromID(key, refIds, (references) =>
+			_storageAccess.ActiveRefHandler.GetReferencesFromID(key, refIds, (references) =>
 			{
 				if(references != null)
 				{
@@ -145,9 +134,42 @@ namespace RDP.SaveLoadSystem
 			return items.ToArray();
 		}
 
-		private void EndUseHandler()
+		public EditableRefValue GetValueRef(string key)
 		{
-			_refHandler = null;
+			return _storageAccess.GetEditableRefValue(ParentStorageCapsuleID, key);
+		}
+
+		public void RemoveValueRef(string key)
+		{
+			_keyToReferenceID.Remove(key);
+		}
+
+		public void SetValueRef(string key, EditableRefValue refValue)
+		{
+			if(_keyToReferenceID.ContainsKey(key))
+			{
+				_keyToReferenceID[key] = refValue.ReferenceID;
+			}
+			else
+			{
+				_keyToReferenceID.Add(key, refValue.ReferenceID);
+			}
+		}
+
+		public void RelocateValueRef(string currentKey, string newKey)
+		{
+			object value;
+			if(_keyToReferenceID.TryGetValue(currentKey, out value))
+			{
+				string refID = value.ToString();
+				RemoveValueRef(currentKey);
+				SetValueRef(newKey, GetValueRef(refID));
+			}
+		}
+
+		public EditableRefValue RegisterNewRefInCapsule(Type referenceType)
+		{
+			return _storageAccess.RegisterNewRefInCapsule(ParentStorageCapsuleID, referenceType);
 		}
 	}
 }
