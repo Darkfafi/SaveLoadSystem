@@ -59,15 +59,21 @@ namespace RDP.SaveLoadSystem
 						}
 
 						List<ISaveable> _allLoadedReferences = new List<ISaveable>();
+						List<string> _allLoadedReferenceIds = new List<string>();
 
 						Action<string> referenceRequestedEventAction = (id) =>
 						{
-							string classTypeFullName;
-							StorageDictionary storage = new StorageDictionary();
+							if(_allLoadedReferenceIds.Contains(id))
+								return;
 
-							if(capsuleToStorage.Value.ContainsKey(id))
+							_allLoadedReferenceIds.Add(id);
+
+							string classTypeFullName;
+							StorageDictionary storage;
+
+							if(!capsuleToStorage.Value.TryGetValue(id, out storage))
 							{
-								storage = capsuleToStorage.Value[id];
+								storage = new StorageDictionary();
 							}
 
 							storage.HandlingRefs(refHandler);
@@ -75,6 +81,7 @@ namespace RDP.SaveLoadSystem
 							if(id == ROOT_SAVE_DATA_CAPSULE_ID)
 							{
 								capsuleToStorage.Key.Load(storage);
+								_allLoadedReferences.Add(capsuleToStorage.Key);
 							}
 							else if(storage.LoadValue(KEY_REFERENCE_TYPE_STRING, out classTypeFullName))
 							{
@@ -93,24 +100,20 @@ namespace RDP.SaveLoadSystem
 							{
 								Debug.LogErrorFormat("UNABLE TO LOAD REFERENCE ID {0}'s CLASS TYPE NAME", id);
 							}
-
-							storage.StopHandlingRefs();
 						};
 
 						refHandler.ReferenceRequestedEvent += referenceRequestedEventAction;
-
 						referenceRequestedEventAction(ROOT_SAVE_DATA_CAPSULE_ID);
-
 						refHandler.LoadRemainingAsNull();
+						refHandler.ReferenceRequestedEvent -= referenceRequestedEventAction;
 
 						for(int i = _allLoadedReferences.Count - 1; i >= 0; i--)
 						{
 							_allLoadedReferences[i].LoadingCompleted();
 						}
 
-						capsuleToStorage.Key.LoadingCompleted();
-
-					   _allLoadedReferences = null;
+						_allLoadedReferences = null;
+						_allLoadedReferenceIds = null;
 					}
 				}
 			}
@@ -136,18 +139,11 @@ namespace RDP.SaveLoadSystem
 								referencesSaved.Add(refID, storageDictForRef);
 								storageDictForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceInstance.GetType().AssemblyQualifiedName);
 								referenceInstance.Save(storageDictForRef);
-								storageDictForRef.StopHandlingRefs();
 							}
 						};
 
 						refHandler.IdForReferenceCreatedEvent += refDetectedAction;
-
-						StorageDictionary entryStorage = new StorageDictionary();
-						entryStorage.HandlingRefs(refHandler);
-						referencesSaved.Add(ROOT_SAVE_DATA_CAPSULE_ID, entryStorage);
-						pair.Key.Save(entryStorage);
-						entryStorage.StopHandlingRefs();
-
+						refDetectedAction(ROOT_SAVE_DATA_CAPSULE_ID, pair.Key);
 						refHandler.IdForReferenceCreatedEvent -= refDetectedAction;
 
 						buffer.Add(pair.Key, referencesSaved);

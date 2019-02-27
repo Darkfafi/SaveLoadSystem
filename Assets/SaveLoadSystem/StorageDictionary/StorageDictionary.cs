@@ -1,5 +1,4 @@
 ﻿using RDP.SaveLoadSystem.Internal;
-using RDP.SaveLoadSystem.Internal.Utils;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -23,12 +22,15 @@ namespace RDP.SaveLoadSystem
 
 		public void HandlingRefs(SaveableReferenceIdHandler refHandler)
 		{
-			_refHandler = refHandler;
-		}
-
-		public void StopHandlingRefs()
-		{
-			_refHandler = null;
+			if(_refHandler == null)
+			{
+				_refHandler = refHandler;
+				_refHandler.ListenToEndUse(EndUseHandler);
+			}
+			else
+			{
+				throw new Exception("Can't start HandlingRefs for a refHandler has already been assigned. Please dispose the first assigned handler before assigning a new one!");
+			}
 		}
 
 		void IStorageReferenceSaver.SaveRef<T>(string key, T value, bool allowNull)
@@ -71,15 +73,13 @@ namespace RDP.SaveLoadSystem
 
 		bool IStorageReferenceLoader.LoadRef<T>(string key, StorageLoadHandler<T> refLoadedCallback)
 		{
-			object refIDObject;
+			string refId = GetRefID(key);
 
-			if(!_keyToReferenceID.TryGetValue(key, out refIDObject))
+			if(string.IsNullOrEmpty(refId))
 			{
 				refLoadedCallback(null);
 				return false;
 			}
-
-			string refId = refIDObject.ToString();
 
 			_refHandler.GetReferenceFromID(refId, (trueReferenceLoad, reference) =>
 			{
@@ -122,6 +122,18 @@ namespace RDP.SaveLoadSystem
 			return true;
 		}
 
+		public string GetRefID(string key)
+		{
+			object refIDObject;
+
+			if(_keyToReferenceID.TryGetValue(key, out refIDObject))
+			{
+				return refIDObject.ToString();
+			}
+
+			return null;
+		}
+
 		public SaveDataItem[] GetReferenceDataItems()
 		{
 			List<SaveDataItem> items = new List<SaveDataItem>();
@@ -131,6 +143,11 @@ namespace RDP.SaveLoadSystem
 			}
 
 			return items.ToArray();
+		}
+
+		private void EndUseHandler()
+		{
+			_refHandler = null;
 		}
 	}
 }

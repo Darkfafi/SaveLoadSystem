@@ -17,6 +17,8 @@ namespace RDP.SaveLoadSystem
 		private Dictionary<string, MultiRefObject> _multiRefsReadyActions = new Dictionary<string, MultiRefObject>();
 		private long _refCounter = 0L;
 
+		private Action _endUseCallbacks;
+
 		public string GetIdForReference(ISaveable reference)
 		{
 			string refID;
@@ -31,6 +33,11 @@ namespace RDP.SaveLoadSystem
 			}
 
 			return refID;
+		}
+
+		public void ListenToEndUse(Action endUseCallback)
+		{
+			_endUseCallbacks += endUseCallback;
 		}
 
 		public void GetReferenceFromID(string refID, StorageLoadHandler callback)
@@ -120,6 +127,9 @@ namespace RDP.SaveLoadSystem
 
 		public void Dispose()
 		{
+			_endUseCallbacks();
+			_endUseCallbacks = null;
+
 			foreach(var pair in _multiRefsReadyActions)
 			{
 				pair.Value.Clean();
