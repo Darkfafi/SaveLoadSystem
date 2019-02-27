@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
-	public class Storage : IEditableStorageAccess
+	public class Storage : IStorageAccess
 	{
 		public enum EncodingType
 		{
@@ -444,6 +444,14 @@ namespace RDP.SaveLoadSystem
 	public interface IStorageCapsule : ISaveableLoad
 	{
 		string ID
+		{
+			get;
+		}
+	}
+
+	public interface IStorageAccess : IEditableStorage
+	{
+		SaveableReferenceIdHandler ActiveRefHandler
 		{
 			get;
 		}

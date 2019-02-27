@@ -8,15 +8,15 @@ namespace RDP.SaveLoadSystem
 	public class StorageDictionary : ValueStorageDictionary, IStorageSaver, IStorageLoader, IStorageDictionaryEditor
 	{
 		private Dictionary<string, object> _keyToReferenceID;
-		private IEditableStorageAccess _storageAccess;
+		private IStorageAccess _storageAccess;
 
-		public StorageDictionary(string parentStorageCapsuleID, IEditableStorageAccess storageAccess) : base(parentStorageCapsuleID)
+		public StorageDictionary(string parentStorageCapsuleID, IStorageAccess storageAccess) : base(parentStorageCapsuleID)
 		{
 			_storageAccess = storageAccess;
 			_keyToReferenceID = new Dictionary<string, object>();
 		}
 
-		public StorageDictionary(string parentStorageCapsuleID, IEditableStorageAccess storageAccess, Dictionary<string, object> loadedValues, Dictionary<string, object> loadedRefs) : base(parentStorageCapsuleID, loadedValues)
+		public StorageDictionary(string parentStorageCapsuleID, IStorageAccess storageAccess, Dictionary<string, object> loadedValues, Dictionary<string, object> loadedRefs) : base(parentStorageCapsuleID, loadedValues)
 		{
 			_storageAccess = storageAccess;
 			_keyToReferenceID = loadedRefs;

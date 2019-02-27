@@ -25,13 +25,8 @@ namespace RDP.SaveLoadSystem
 		void RelocateValue(string currentKey, string newKey);
 	}
 
-	public interface IEditableStorageAccess
+	public interface IEditableStorage
 	{
-		SaveableReferenceIdHandler ActiveRefHandler
-		{
-			get;
-		}
-
 		EditableRefValue GetEditableRefValue(string storageCapsuleID, string key);
 		EditableRefValue RegisterNewRefInCapsule(string storageCapsuleID, Type referenceType);
 		bool TryRead(string storageCapsuleID, out ReadStorageResult readStorageResult);
