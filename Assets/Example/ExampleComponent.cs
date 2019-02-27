@@ -26,7 +26,7 @@ namespace RPD.SaveLoadSystem.Example
 		public void Awake()
 		{
 			_storage = new Storage("Saves/", Storage.EncodingType.Base64, this);
-			_storage.Load(EXAMPLE_CAPSULE); // Can be left empty to load all given capsules.
+			_storage.Load();
 		}
 
 		protected void Update()
@@ -41,9 +41,9 @@ namespace RPD.SaveLoadSystem.Example
 		public void OnDestroy()
 		{
 			if(!ClearSavesAtOnDestroy)
-				_storage.Save(true, EXAMPLE_CAPSULE); // Can be left empty to save all given capsules.
+				_storage.Save(true); // Can be left empty to save all given capsules.
 			else
-				_storage.Clear(RemoveFileOnClear, EXAMPLE_CAPSULE);
+				_storage.Clear(RemoveFileOnClear);
 		}
 
 		public void Save(IStorageSaver saver)

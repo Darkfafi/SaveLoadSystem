@@ -50,79 +50,76 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
-		public void Load(params string[] storageCapsuleIDs)
+		public void Load()
 		{
 			using(ActiveRefHandler = new SaveableReferenceIdHandler())
 			{
 				foreach(var capsuleToStorage in _cachedStorageCapsules)
 				{
-					if(storageCapsuleIDs == null || storageCapsuleIDs.Length == 0 || Array.IndexOf(storageCapsuleIDs, capsuleToStorage.Key.ID) >= 0)
+					if(capsuleToStorage.Value == null)
 					{
-						if(capsuleToStorage.Value == null)
-						{
-							RefreshCachedData(capsuleToStorage.Key);
-						}
-
-						List<ISaveable> _allLoadedReferences = new List<ISaveable>();
-						List<string> _allLoadedReferenceIds = new List<string>();
-
-						Action<string> referenceRequestedEventAction = (id) =>
-						{
-							if(_allLoadedReferenceIds.Contains(id))
-								return;
-
-							_allLoadedReferenceIds.Add(id);
-
-							string classTypeFullName;
-							StorageDictionary storage;
-
-							if(!capsuleToStorage.Value.TryGetValue(id, out storage))
-							{
-								storage = new StorageDictionary(capsuleToStorage.Key.ID, this);
-							}
-
-							if(id == ROOT_SAVE_DATA_CAPSULE_ID)
-							{
-								capsuleToStorage.Key.Load(storage);
-								_allLoadedReferences.Add(capsuleToStorage.Key);
-							}
-							else if(storage.LoadValue(KEY_REFERENCE_TYPE_STRING, out classTypeFullName))
-							{
-								IStorageLoader loader = storage;
-								Type referenceType = Type.GetType(classTypeFullName);
-								bool methodLoadInterface = typeof(ISaveableLoad).IsAssignableFrom(referenceType);
-								ISaveable referenceInstance = (methodLoadInterface ? Activator.CreateInstance(referenceType) : Activator.CreateInstance(referenceType, loader)) as ISaveable;
-								ActiveRefHandler.SetReferenceReady(referenceInstance, id);
-
-								if(methodLoadInterface)
-									((ISaveableLoad)referenceInstance).Load(loader);
-
-								_allLoadedReferences.Add(referenceInstance);
-							}
-							else
-							{
-								Debug.LogErrorFormat("UNABLE TO LOAD REFERENCE ID {0}'s CLASS TYPE NAME", id);
-							}
-						};
-
-						ActiveRefHandler.ReferenceRequestedEvent += referenceRequestedEventAction;
-						referenceRequestedEventAction(ROOT_SAVE_DATA_CAPSULE_ID);
-						ActiveRefHandler.LoadRemainingAsNull();
-						ActiveRefHandler.ReferenceRequestedEvent -= referenceRequestedEventAction;
-
-						for(int i = _allLoadedReferences.Count - 1; i >= 0; i--)
-						{
-							_allLoadedReferences[i].LoadingCompleted();
-						}
-
-						_allLoadedReferences = null;
-						_allLoadedReferenceIds = null;
+						RefreshCachedData(capsuleToStorage.Key);
 					}
+
+					List<ISaveable> _allLoadedReferences = new List<ISaveable>();
+					List<string> _allLoadedReferenceIds = new List<string>();
+
+					Action<string> referenceRequestedEventAction = (id) =>
+					{
+						if(_allLoadedReferenceIds.Contains(id))
+							return;
+
+						_allLoadedReferenceIds.Add(id);
+
+						string classTypeFullName;
+						StorageDictionary storage;
+
+						if(!capsuleToStorage.Value.TryGetValue(id, out storage))
+						{
+							storage = new StorageDictionary(capsuleToStorage.Key.ID, this);
+						}
+
+						if(id == ROOT_SAVE_DATA_CAPSULE_ID)
+						{
+							capsuleToStorage.Key.Load(storage);
+							_allLoadedReferences.Add(capsuleToStorage.Key);
+						}
+						else if(storage.LoadValue(KEY_REFERENCE_TYPE_STRING, out classTypeFullName))
+						{
+							IStorageLoader loader = storage;
+							Type referenceType = Type.GetType(classTypeFullName);
+							bool methodLoadInterface = typeof(ISaveableLoad).IsAssignableFrom(referenceType);
+							ISaveable referenceInstance = (methodLoadInterface ? Activator.CreateInstance(referenceType) : Activator.CreateInstance(referenceType, loader)) as ISaveable;
+							ActiveRefHandler.SetReferenceReady(referenceInstance, id);
+
+							if(methodLoadInterface)
+								((ISaveableLoad)referenceInstance).Load(loader);
+
+							_allLoadedReferences.Add(referenceInstance);
+						}
+						else
+						{
+							Debug.LogErrorFormat("UNABLE TO LOAD REFERENCE ID {0}'s CLASS TYPE NAME", id);
+						}
+					};
+
+					ActiveRefHandler.ReferenceRequestedEvent += referenceRequestedEventAction;
+					referenceRequestedEventAction(ROOT_SAVE_DATA_CAPSULE_ID);
+					ActiveRefHandler.LoadRemainingAsNull();
+					ActiveRefHandler.ReferenceRequestedEvent -= referenceRequestedEventAction;
+
+					for(int i = _allLoadedReferences.Count - 1; i >= 0; i--)
+					{
+						_allLoadedReferences[i].LoadingCompleted();
+					}
+
+					_allLoadedReferences = null;
+					_allLoadedReferenceIds = null;
 				}
 			}
 		}
 
-		public void Save(bool flushAfterSave, params string[] storageCapsuleIDs)
+		public void Save(bool flushAfterSave)
 		{
 			Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> buffer = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
 			Dictionary<string, IStorageCapsule> _alreadySavedReferencesToOriginCapsuleMap = new Dictionary<string, IStorageCapsule>();
@@ -130,39 +127,36 @@ namespace RDP.SaveLoadSystem
 			{
 				foreach(var pair in _cachedStorageCapsules)
 				{
-					if(storageCapsuleIDs == null || storageCapsuleIDs.Length == 0 || Array.IndexOf(storageCapsuleIDs, pair.Key.ID) >= 0)
+					Dictionary<string, StorageDictionary> referencesSaved = new Dictionary<string, StorageDictionary>();
+
+					Action<string, ISaveable> refDetectedAction = (refID, referenceInstance) =>
 					{
-						Dictionary<string, StorageDictionary> referencesSaved = new Dictionary<string, StorageDictionary>();
-
-						Action<string, ISaveable> refDetectedAction = (refID, referenceInstance) =>
+						IStorageCapsule holdingCapsule;
+						if(_alreadySavedReferencesToOriginCapsuleMap.TryGetValue(refID, out holdingCapsule))
 						{
-							IStorageCapsule holdingCapsule;
-							if(_alreadySavedReferencesToOriginCapsuleMap.TryGetValue(refID, out holdingCapsule))
+							if(holdingCapsule != pair.Key)
 							{
-								if(holdingCapsule != pair.Key)
-								{
-									throw new Exception(string.Format("Save aborted! Reference {0} saved in capsule {1} while capsule {2} is saving it now! Each capsule should not be saving cross references!", referenceInstance.ToString(), holdingCapsule.ID, pair.Key.ID));
-								}
+								throw new Exception(string.Format("Save aborted! Reference {0} saved in capsule {1} while capsule {2} is saving it now! Each capsule should not be saving cross references!", referenceInstance.ToString(), holdingCapsule.ID, pair.Key.ID));
 							}
+						}
 
-							if(!referencesSaved.ContainsKey(refID))
-							{
-								StorageDictionary storageDictForRef = new StorageDictionary(pair.Key.ID, this);
-								referencesSaved.Add(refID, storageDictForRef);
-								storageDictForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceInstance.GetType().AssemblyQualifiedName);
-								referenceInstance.Save(storageDictForRef);
+						if(!referencesSaved.ContainsKey(refID))
+						{
+							StorageDictionary storageDictForRef = new StorageDictionary(pair.Key.ID, this);
+							referencesSaved.Add(refID, storageDictForRef);
+							storageDictForRef.SaveValue(KEY_REFERENCE_TYPE_STRING, referenceInstance.GetType().AssemblyQualifiedName);
+							referenceInstance.Save(storageDictForRef);
 
-								if(refID != ROOT_SAVE_DATA_CAPSULE_ID)
-									_alreadySavedReferencesToOriginCapsuleMap.Add(refID, pair.Key);
-							}
-						};
+							if(refID != ROOT_SAVE_DATA_CAPSULE_ID)
+								_alreadySavedReferencesToOriginCapsuleMap.Add(refID, pair.Key);
+						}
+					};
 
-						ActiveRefHandler.IdForReferenceRequestedEvent += refDetectedAction;
-						refDetectedAction(ROOT_SAVE_DATA_CAPSULE_ID, pair.Key);
-						ActiveRefHandler.IdForReferenceRequestedEvent -= refDetectedAction;
+					ActiveRefHandler.IdForReferenceRequestedEvent += refDetectedAction;
+					refDetectedAction(ROOT_SAVE_DATA_CAPSULE_ID, pair.Key);
+					ActiveRefHandler.IdForReferenceRequestedEvent -= refDetectedAction;
 
-						buffer.Add(pair.Key, referencesSaved);
-					}
+					buffer.Add(pair.Key, referencesSaved);
 				}
 			}
 
@@ -172,7 +166,7 @@ namespace RDP.SaveLoadSystem
 			}
 
 			if(flushAfterSave)
-				Flush(storageCapsuleIDs);
+				Flush();
 		}
 
 		public bool TryRead(string storageCapsuleID, out ReadStorageResult readStorageResult)
