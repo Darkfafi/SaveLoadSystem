@@ -43,6 +43,12 @@ namespace RDP.SaveLoadSystem
 		{
 			_storageLocationPath = storageLocationPath;
 			_encodingOption = encodingType;
+			UpdateStorage(allStorageCapsules);
+		}
+
+		public void UpdateStorage(params IStorageCapsule[] allStorageCapsules)
+		{
+			_cachedStorageCapsules.Clear();
 			for(int i = 0, c = allStorageCapsules.Length; i < c; i++)
 			{
 				_cachedStorageCapsules.Add(allStorageCapsules[i], null);
@@ -52,10 +58,18 @@ namespace RDP.SaveLoadSystem
 
 		public void Load()
 		{
+			Load(null);
+		}
+
+		public void Load(string storageCapsuleID)
+		{
 			using(ActiveRefHandler = new SaveableReferenceIdHandler())
 			{
 				foreach(var capsuleToStorage in _cachedStorageCapsules)
 				{
+					if(!string.IsNullOrEmpty(storageCapsuleID) && capsuleToStorage.Key.ID != storageCapsuleID)
+						continue;
+
 					if(capsuleToStorage.Value == null)
 					{
 						RefreshCachedData(capsuleToStorage.Key);
@@ -121,12 +135,20 @@ namespace RDP.SaveLoadSystem
 
 		public void Save(bool flushAfterSave)
 		{
+			Save(null, flushAfterSave);
+		}
+
+		public void Save(string storageCapsuleID, bool flushAfterSave)
+		{
 			Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> buffer = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
 			Dictionary<string, IStorageCapsule> _alreadySavedReferencesToOriginCapsuleMap = new Dictionary<string, IStorageCapsule>();
 			using(ActiveRefHandler = new SaveableReferenceIdHandler())
 			{
 				foreach(var pair in _cachedStorageCapsules)
 				{
+					if(!string.IsNullOrEmpty(storageCapsuleID) && pair.Key.ID != storageCapsuleID)
+						continue;
+
 					Dictionary<string, StorageDictionary> referencesSaved = new Dictionary<string, StorageDictionary>();
 
 					Action<string, ISaveable> refDetectedAction = (refID, referenceInstance) =>
@@ -319,7 +341,7 @@ namespace RDP.SaveLoadSystem
 				for(int i = 0, c = saveDataForCapsule.ReferencesSaveData.Length; i < c; i++)
 				{
 					SaveDataForReference refData = saveDataForCapsule.ReferencesSaveData[i];
-					referencesSaveData.Add(refData.ReferenceID, new StorageDictionary(capsuleToLoad.ID, this, SaveDataItem.ToDictionary(refData.ValueDataItems), SaveDataItem.ToDictionary(refData.ReferenceDataItems)));
+					referencesSaveData.Add(refData.ReferenceID, new StorageDictionary(capsuleToLoad.ID, this, SaveDataItem.ToDictionary(refData.ValueDataItems), SaveDataItem.ToObjectDictionary(refData.ReferenceDataItems)));
 				}
 			}
 

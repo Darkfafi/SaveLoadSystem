@@ -28,8 +28,11 @@ namespace RDP.SaveLoadSystem.Internal.Utils
 			return valueString.ToString();
 		}
 
-		public static string ToJSON(object value)
+		public static string ToJSON(object value, Type specifiedType)
 		{
+			if(value == null && specifiedType == typeof(string))
+				value = "";
+
 			return (value.GetType().IsValueType && !value.GetType().IsPrimitive) ? JsonUtility.ToJson(value) : value.ToString();
 		}
 	}

@@ -12,27 +12,37 @@ namespace RDP.SaveLoadSystem
 			get; private set;
 		}
 
-		private Dictionary<string, object> _keyToNormalValue;
+		private Dictionary<string, SaveableValueSection> _keyToNormalValue;
 
 		public ValueStorageDictionary(string parentStorageCapsuleID)
 		{
-			_keyToNormalValue = new Dictionary<string, object>();
+			_keyToNormalValue = new Dictionary<string, SaveableValueSection>();
 		}
 
-		public ValueStorageDictionary(string parentStorageCapsuleID, Dictionary<string, object> loadedValues)
+		public ValueStorageDictionary(string parentStorageCapsuleID, Dictionary<string, SaveableValueSection> loadedValues)
 		{
 			_keyToNormalValue = loadedValues;
 		}
 
 		public void SaveValue<T>(string key, T value) where T : IConvertible, IComparable
 		{
-			ThrowExceptionWhenISaveable("It is forbidden use this method to save an `ISaveable`! Use `SaveRef` instead!", typeof(T));
-			Save(key, value);
+			Type t = typeof(T);
+			ThrowExceptionWhenISaveable("It is forbidden use this method to save an `ISaveable`! Use `SaveRef` instead!", t);
+			if(t.IsClass && !t.IsPrimitive && t != typeof(string))
+			{
+				throw new Exception(string.Format("Can't save value `{0}` under key `{1}` for it is not of a value or primitive type!", value, key));
+			}
+			Save(key, value, t);
 		}
 
 		public void SaveValues<T>(string key, T[] values) where T : IConvertible, IComparable
 		{
-			ThrowExceptionWhenISaveable("It is forbidden use this method to save an `ISaveable`! Use `SaveRefs` instead!", typeof(T));
+			Type t = typeof(T);
+			ThrowExceptionWhenISaveable("It is forbidden use this method to save an `ISaveable`! Use `SaveRefs` instead!", t);
+			if(t.IsClass && !t.IsPrimitive)
+			{
+				throw new Exception(string.Format("Can't save list of values under key `{1}` for they are not of a value or primitive type!", values, key));
+			}
 			SaveStruct(key, SaveableArray<T>.From(values));
 		}
 
@@ -72,7 +82,7 @@ namespace RDP.SaveLoadSystem
 
 		public void SaveStruct<T>(string key, T value) where T : struct
 		{
-			Save(key, value);
+			Save(key, value, typeof(T));
 		}
 
 		public void SaveStructs<T>(string key, T[] values) where T : struct
@@ -136,21 +146,22 @@ namespace RDP.SaveLoadSystem
 		{
 			if(_keyToNormalValue.ContainsKey(key))
 			{
-				_keyToNormalValue[key] = value;
+				_keyToNormalValue[key] = new SaveableValueSection(value, value.GetType());
 			}
 			else
 			{
-				_keyToNormalValue.Add(key, value);
+				_keyToNormalValue.Add(key, new SaveableValueSection(value, value.GetType()));
 			}
 		}
 
 		public object GetValue(string key)
 		{
-			object readValue;
+			SaveableValueSection readValue;
 			if(_keyToNormalValue.TryGetValue(key, out readValue))
 			{
-				return readValue;
+				return readValue.GetValue();
 			}
+
 			return null;
 		}
 
@@ -161,11 +172,11 @@ namespace RDP.SaveLoadSystem
 
 		public void RelocateValue(string currentKey, string newKey)
 		{
-			object value;
+			SaveableValueSection value;
 			if(_keyToNormalValue.TryGetValue(currentKey, out value))
 			{
 				_keyToNormalValue.Remove(currentKey);
-				SetValue(newKey, value);
+				SetValue(newKey, value.GetValue());
 			}
 		}
 
@@ -174,28 +185,28 @@ namespace RDP.SaveLoadSystem
 			List<SaveDataItem> items = new List<SaveDataItem>();
 			foreach(var pair in _keyToNormalValue)
 			{
-				items.Add(new SaveDataItem(pair.Key, pair.Value));
+				items.Add(new SaveDataItem(pair.Key, pair.Value.GetValue()));
 			}
 
 			return items.ToArray();
 		}
 
-		private void Save(string key, object value)
+		private void Save(string key, object value, Type specifiedType)
 		{
-			_keyToNormalValue.Add(key, value);
+			_keyToNormalValue.Add(key, new SaveableValueSection(value, specifiedType));
 		}
 
 		private bool Load<T>(string key, out T value)
 		{
-			object v;
+			SaveableValueSection v;
 			value = default(T);
 
 			if(!_keyToNormalValue.TryGetValue(key, out v))
 				return false;
 
-			if(v.GetType().IsAssignableFrom(typeof(T)))
+			if(v.GetValueType().IsAssignableFrom(typeof(T)))
 			{
-				value = (T)v;
+				value = (T)v.GetValue();
 				return true;
 			}
 

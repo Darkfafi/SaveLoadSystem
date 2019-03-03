@@ -14,13 +14,18 @@ namespace RDP.SaveLoadSystem.Internal
 			if(specifiedType == null)
 				specifiedType = value.GetType();
 
-			ValueString = PrimitiveToValueParserUtility.ToJSON(value);
+			ValueString = PrimitiveToValueParserUtility.ToJSON(value, specifiedType);
 			ValueType = specifiedType.AssemblyQualifiedName;
 		}
 
 		public object GetValue()
 		{
-			return PrimitiveToValueParserUtility.FromJSON(ValueString, Type.GetType(ValueType));
+			return PrimitiveToValueParserUtility.FromJSON(ValueString, GetValueType());
+		}
+
+		public Type GetValueType()
+		{
+			return Type.GetType(ValueType);
 		}
 	}
 }

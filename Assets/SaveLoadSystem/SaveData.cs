@@ -39,13 +39,25 @@ namespace RDP.SaveLoadSystem.Internal
 			ValueSection = new SaveableValueSection(value);
 		}
 
-		public static Dictionary<string, object> ToDictionary(SaveDataItem[] itemsCollection)
+		public static Dictionary<string, object> ToObjectDictionary(SaveDataItem[] itemsCollection)
 		{
 			Dictionary<string, object> returnValue = new Dictionary<string, object>();
 
 			for(int i = 0, c = itemsCollection.Length; i < c; i++)
 			{
 				returnValue.Add(itemsCollection[i].SectionKey, itemsCollection[i].ValueSection.GetValue());
+			}
+
+			return returnValue;
+		}
+
+		public static Dictionary<string, SaveableValueSection> ToDictionary(SaveDataItem[] itemsCollection)
+		{
+			Dictionary<string, SaveableValueSection> returnValue = new Dictionary<string, SaveableValueSection>();
+
+			for(int i = 0, c = itemsCollection.Length; i < c; i++)
+			{
+				returnValue.Add(itemsCollection[i].SectionKey, itemsCollection[i].ValueSection);
 			}
 
 			return returnValue;

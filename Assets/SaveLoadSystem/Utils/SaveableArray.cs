@@ -17,7 +17,7 @@ namespace RDP.SaveLoadSystem.Internal.Utils
 			SaveableValueSection[] items = new SaveableValueSection[array.Length];
 			for(int i = 0; i < array.Length; i++)
 			{
-				items[i] = new SaveableValueSection(array[i]);
+				items[i] = new SaveableValueSection(array[i], typeof(T));
 			}
 			return new SaveableArray<T>(items);
 		}

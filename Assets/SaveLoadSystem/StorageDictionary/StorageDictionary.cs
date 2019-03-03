@@ -16,7 +16,7 @@ namespace RDP.SaveLoadSystem
 			_keyToReferenceID = new Dictionary<string, object>();
 		}
 
-		public StorageDictionary(string parentStorageCapsuleID, IStorageAccess storageAccess, Dictionary<string, object> loadedValues, Dictionary<string, object> loadedRefs) : base(parentStorageCapsuleID, loadedValues)
+		public StorageDictionary(string parentStorageCapsuleID, IStorageAccess storageAccess, Dictionary<string, SaveableValueSection> loadedValues, Dictionary<string, object> loadedRefs) : base(parentStorageCapsuleID, loadedValues)
 		{
 			_storageAccess = storageAccess;
 			_keyToReferenceID = loadedRefs;
