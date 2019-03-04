@@ -56,18 +56,14 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
-		public void Load()
-		{
-			Load(null);
-		}
-
-		public void Load(string storageCapsuleID)
+		public void Load(params string[] storageCapsuleIDs)
 		{
 			using(ActiveRefHandler = new SaveableReferenceIdHandler())
 			{
 				foreach(var capsuleToStorage in _cachedStorageCapsules)
 				{
-					if(!string.IsNullOrEmpty(storageCapsuleID) && capsuleToStorage.Key.ID != storageCapsuleID)
+
+					if(storageCapsuleIDs != null && storageCapsuleIDs.Length > 0 && Array.IndexOf(storageCapsuleIDs, capsuleToStorage.Key.ID) < 0)
 						continue;
 
 					if(capsuleToStorage.Value == null)
@@ -133,12 +129,7 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
-		public void Save(bool flushAfterSave)
-		{
-			Save(null, flushAfterSave);
-		}
-
-		public void Save(string storageCapsuleID, bool flushAfterSave)
+		public void Save(bool flushAfterSave, params string[] storageCapsuleIDs)
 		{
 			Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> buffer = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
 			Dictionary<string, IStorageCapsule> _alreadySavedReferencesToOriginCapsuleMap = new Dictionary<string, IStorageCapsule>();
@@ -146,7 +137,7 @@ namespace RDP.SaveLoadSystem
 			{
 				foreach(var pair in _cachedStorageCapsules)
 				{
-					if(!string.IsNullOrEmpty(storageCapsuleID) && pair.Key.ID != storageCapsuleID)
+					if(storageCapsuleIDs != null && storageCapsuleIDs.Length > 0 && Array.IndexOf(storageCapsuleIDs, pair.Key.ID) < 0)
 						continue;
 
 					Dictionary<string, StorageDictionary> referencesSaved = new Dictionary<string, StorageDictionary>();
@@ -324,7 +315,7 @@ namespace RDP.SaveLoadSystem
 					}
 					catch(Exception e)
 					{
-						throw new Exception(string.Format("Could not save file {0}. Error: {1}", capsuleMapItem.Key,  e.Message));
+						throw new Exception(string.Format("Could not save file {0}. Error: {1}", capsuleMapItem.Key, e.Message));
 					}
 				}
 			}
@@ -383,7 +374,7 @@ namespace RDP.SaveLoadSystem
 				case EncodingType.Base64:
 					return Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
 				default:
-					Debug.LogErrorFormat ("Encryption type {0} not supported!", _encodingOption);
+					Debug.LogErrorFormat("Encryption type {0} not supported!", _encodingOption);
 					return text;
 			}
 		}
