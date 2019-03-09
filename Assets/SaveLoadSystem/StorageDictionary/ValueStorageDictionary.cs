@@ -39,7 +39,7 @@ namespace RDP.SaveLoadSystem
 		{
 			Type t = typeof(T);
 			ThrowExceptionWhenISaveable("It is forbidden use this method to save an `ISaveable`! Use `SaveRefs` instead!", t);
-			if(t.IsClass && !t.IsPrimitive)
+			if(t.IsClass && !t.IsPrimitive && t != typeof(string))
 			{
 				throw new Exception(string.Format("Can't save list of values under key `{1}` for they are not of a value or primitive type!", values, key));
 			}
