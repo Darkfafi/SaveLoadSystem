@@ -48,5 +48,6 @@ namespace RDP.SaveLoadSystem
 		T LoadStruct<T>(string key) where T : struct;
 		T[] LoadStructs<T>(string key) where T : struct;
 		bool LoadDict<T, U>(string key, out Dictionary<T, U> value);
+		Dictionary<T, U> LoadDict<T, U>(string key);
 	}
 }

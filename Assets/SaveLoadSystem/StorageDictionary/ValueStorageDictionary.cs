@@ -142,6 +142,13 @@ namespace RDP.SaveLoadSystem
 			return false;
 		}
 
+		public Dictionary<T, U> LoadDict<T, U>(string key)
+		{
+			Dictionary<T, U> v;
+			LoadDict(key, out v);
+			return v;
+		}
+
 		public void SetValue(string key, object value)
 		{
 			if(_keyToNormalValue.ContainsKey(key))
