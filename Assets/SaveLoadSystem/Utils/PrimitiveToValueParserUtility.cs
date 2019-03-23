@@ -16,6 +16,10 @@ namespace RDP.SaveLoadSystem.Internal.Utils
 				return short.Parse(valueString);
 			if(valueType == typeof(int))
 				return int.Parse(valueString);
+			if(valueType == typeof(uint))
+				return uint.Parse(valueString);
+			if(valueType == typeof(ulong))
+				return ulong.Parse(valueString);
 			if(valueType == typeof(long))
 				return long.Parse(valueString);
 			if(valueType == typeof(float))
