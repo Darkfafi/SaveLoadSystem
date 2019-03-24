@@ -51,7 +51,7 @@ namespace RDP.SaveLoadSystem
 			_cachedStorageCapsules.Clear();
 			for(int i = 0, c = allStorageCapsules.Length; i < c; i++)
 			{
-				_cachedStorageCapsules.Add(allStorageCapsules[i], null);
+				_cachedStorageCapsules.Add(allStorageCapsules[i], new Dictionary<string, StorageDictionary>());
 				RefreshCachedData(allStorageCapsules[i]);
 			}
 		}
@@ -60,16 +60,13 @@ namespace RDP.SaveLoadSystem
 		{
 			using(ActiveRefHandler = new SaveableReferenceIdHandler())
 			{
+				RefreshCachedData(storageCapsuleIDs);
+
 				foreach(var capsuleToStorage in _cachedStorageCapsules)
 				{
 
 					if(storageCapsuleIDs != null && storageCapsuleIDs.Length > 0 && Array.IndexOf(storageCapsuleIDs, capsuleToStorage.Key.ID) < 0)
 						continue;
-
-					if(capsuleToStorage.Value == null)
-					{
-						RefreshCachedData(capsuleToStorage.Key);
-					}
 
 					List<ISaveable> _allLoadedReferences = new List<ISaveable>();
 					List<string> _allLoadedReferenceIds = new List<string>();
@@ -200,15 +197,12 @@ namespace RDP.SaveLoadSystem
 		{
 			List<ReadStorageResult> storageDicts = new List<ReadStorageResult>();
 
+			RefreshCachedData(storageCapsuleIDs);
+
 			foreach(var capsuleToStorage in _cachedStorageCapsules)
 			{
 				if(storageCapsuleIDs == null || storageCapsuleIDs.Length == 0 || Array.IndexOf(storageCapsuleIDs, capsuleToStorage.Key.ID) >= 0)
 				{
-					if(capsuleToStorage.Value == null)
-					{
-						RefreshCachedData(capsuleToStorage.Key);
-					}
-
 					StorageDictionary capsuleStorage = null;
 					List<KeyValuePair<Type, IStorageDictionaryEditor>> refStorages = new List<KeyValuePair<Type, IStorageDictionaryEditor>>();
 					if(capsuleToStorage.Value.TryGetValue(ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID, out capsuleStorage))
@@ -222,9 +216,14 @@ namespace RDP.SaveLoadSystem
 								refStorages.Add(new KeyValuePair<Type, IStorageDictionaryEditor>(referenceType, storageItem.Value));
 							}
 						}
-
-						storageDicts.Add(new ReadStorageResult(capsuleToStorage.Key.ID, capsuleStorage, refStorages));
 					}
+					else
+					{
+						capsuleStorage = new StorageDictionary(capsuleToStorage.Key.ID, this);
+						capsuleToStorage.Value.Add(ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID, capsuleStorage);
+					}
+
+					storageDicts.Add(new ReadStorageResult(capsuleToStorage.Key.ID, capsuleStorage, refStorages));
 				}
 			}
 
@@ -318,6 +317,23 @@ namespace RDP.SaveLoadSystem
 						throw new Exception(string.Format("Could not save file {0}. Error: {1}", capsuleMapItem.Key, e.Message));
 					}
 				}
+			}
+		}
+
+		private void RefreshCachedData(string[] capsuleIDs)
+		{
+			List<IStorageCapsule> capsules = new List<IStorageCapsule>();
+			foreach(var pair in _cachedStorageCapsules)
+			{
+				if(Array.IndexOf(capsuleIDs, pair.Key.ID) >= 0)
+				{
+					capsules.Add(pair.Key);
+				}
+			}
+
+			for(int i = 0; i < capsules.Count; i++)
+			{
+				RefreshCachedData(capsules[i]);
 			}
 		}
 

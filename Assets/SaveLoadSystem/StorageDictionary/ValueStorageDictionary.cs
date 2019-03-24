@@ -16,11 +16,13 @@ namespace RDP.SaveLoadSystem
 
 		public ValueStorageDictionary(string parentStorageCapsuleID)
 		{
+			ParentStorageCapsuleID = parentStorageCapsuleID;
 			_keyToNormalValue = new Dictionary<string, SaveableValueSection>();
 		}
 
 		public ValueStorageDictionary(string parentStorageCapsuleID, Dictionary<string, SaveableValueSection> loadedValues)
 		{
+			ParentStorageCapsuleID = parentStorageCapsuleID;
 			_keyToNormalValue = loadedValues;
 		}
 

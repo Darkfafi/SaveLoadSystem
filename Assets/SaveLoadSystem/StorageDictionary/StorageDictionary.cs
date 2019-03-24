@@ -146,14 +146,7 @@ namespace RDP.SaveLoadSystem
 
 		public void SetValueRef(string key, EditableRefValue refValue)
 		{
-			if(_keyToReferenceID.ContainsKey(key))
-			{
-				_keyToReferenceID[key] = refValue.ReferenceID;
-			}
-			else
-			{
-				_keyToReferenceID.Add(key, refValue.ReferenceID);
-			}
+			_keyToReferenceID[key] = refValue.ReferenceID;
 		}
 
 		public void RelocateValueRef(string currentKey, string newKey)
