@@ -213,6 +213,12 @@ namespace RDP.SaveLoadSystem
 			if(!_keyToNormalValue.TryGetValue(key, out v))
 				return false;
 
+			if (v.GetValueType() == null)
+			{
+				UnityEngine.Debug.LogError($"No Type found for {v.ValueType}. This means the type was removed or renamed. Please migrate this change!");
+				return false;
+			}
+
 			if(v.GetValueType().IsAssignableFrom(typeof(T)))
 			{
 				value = (T)v.GetValue();
