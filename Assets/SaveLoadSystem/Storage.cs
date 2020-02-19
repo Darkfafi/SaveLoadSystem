@@ -25,9 +25,17 @@ namespace RDP.SaveLoadSystem
 			get; private set;
 		}
 
+		public string StorageLocationPath
+		{
+			get; private set;
+		}
+
+		public EncodingType EncodingOption
+		{
+			get; private set;
+		}
+
 		private Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> _cachedStorageCapsules = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
-		private EncodingType _encodingOption;
-		private string _storageLocationPath;
 
 		public static string GetPathToStorageCapsule(string locationPath, IStorageCapsule capsule, bool addFileType)
 		{
@@ -41,8 +49,8 @@ namespace RDP.SaveLoadSystem
 
 		public Storage(string storageLocationPath, EncodingType encodingType, params IStorageCapsule[] allStorageCapsules)
 		{
-			_storageLocationPath = storageLocationPath;
-			_encodingOption = encodingType;
+			StorageLocationPath = storageLocationPath;
+			EncodingOption = encodingType;
 			UpdateStorage(allStorageCapsules);
 		}
 
@@ -241,14 +249,14 @@ namespace RDP.SaveLoadSystem
 				}
 			}
 
-			if(!Directory.Exists(GetPathToStorage(_storageLocationPath)))
+			if(!Directory.Exists(GetPathToStorage(StorageLocationPath)))
 				return;
 
 			foreach(var pair in buffer)
 			{
 				if(removeSaveFiles)
 				{
-					string pathToFile = GetPathToStorageCapsule(_storageLocationPath, pair.Key, true);
+					string pathToFile = GetPathToStorageCapsule(StorageLocationPath, pair.Key, true);
 					if(File.Exists(pathToFile))
 					{
 						File.Delete(pathToFile);
@@ -260,8 +268,8 @@ namespace RDP.SaveLoadSystem
 				}
 			}
 
-			if(Directory.GetFiles(GetPathToStorage(_storageLocationPath)).Length == 0)
-				Directory.Delete(GetPathToStorage(_storageLocationPath));
+			if(Directory.GetFiles(GetPathToStorage(StorageLocationPath)).Length == 0)
+				Directory.Delete(GetPathToStorage(StorageLocationPath));
 
 			if(!removeSaveFiles)
 				Flush(storageCapsuleIDs);
@@ -297,13 +305,13 @@ namespace RDP.SaveLoadSystem
 
 					try
 					{
-						string pathToStorage = GetPathToStorage(_storageLocationPath);
+						string pathToStorage = GetPathToStorage(StorageLocationPath);
 						if(!Directory.Exists(pathToStorage))
 						{
 							Directory.CreateDirectory(pathToStorage);
 						}
 
-						using(StreamWriter writer = new StreamWriter(GetPathToStorageCapsule(_storageLocationPath, capsuleMapItem.Key, true)))
+						using(StreamWriter writer = new StreamWriter(GetPathToStorageCapsule(StorageLocationPath, capsuleMapItem.Key, true)))
 						{
 							writer.Write(Encode(JsonUtility.ToJson(new SaveFileWrapper()
 							{
@@ -357,7 +365,7 @@ namespace RDP.SaveLoadSystem
 
 		private SaveData LoadFromDisk(IStorageCapsule capsuleToLoad)
 		{
-			string path = GetPathToStorageCapsule(_storageLocationPath, capsuleToLoad, true);
+			string path = GetPathToStorageCapsule(StorageLocationPath, capsuleToLoad, true);
 			if(File.Exists(path))
 			{
 				using(StreamReader reader = File.OpenText(path))
@@ -383,28 +391,28 @@ namespace RDP.SaveLoadSystem
 
 		private string Encode(string text)
 		{
-			switch(_encodingOption)
+			switch(EncodingOption)
 			{
 				case EncodingType.None:
 					return text;
 				case EncodingType.Base64:
 					return Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
 				default:
-					Debug.LogErrorFormat("Encryption type {0} not supported!", _encodingOption);
+					Debug.LogErrorFormat("Encryption type {0} not supported!", EncodingOption);
 					return text;
 			}
 		}
 
 		private string Decode(string text)
 		{
-			switch(_encodingOption)
+			switch(EncodingOption)
 			{
 				case EncodingType.None:
 					return text;
 				case EncodingType.Base64:
 					return Encoding.UTF8.GetString(Convert.FromBase64String(text));
 				default:
-					Debug.LogErrorFormat("Decryption type {0} not supported!", _encodingOption);
+					Debug.LogErrorFormat("Decryption type {0} not supported!", EncodingOption);
 					return text;
 			}
 		}
@@ -439,7 +447,15 @@ namespace RDP.SaveLoadSystem
 						string referenceTypeString;
 						if(storageForRef.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out referenceTypeString))
 						{
-							Type refType = Type.GetType(referenceTypeString);
+							Type refType;
+							try
+							{
+								refType = Type.GetType(referenceTypeString);
+							}
+							catch
+							{
+								refType = null;
+							}
 							return new EditableRefValue(refID, refType, storageForRef);
 						}
 					}

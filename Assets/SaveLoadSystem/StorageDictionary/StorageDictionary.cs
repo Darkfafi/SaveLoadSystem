@@ -10,6 +10,17 @@ namespace RDP.SaveLoadSystem
 		private Dictionary<string, object> _keyToReferenceID;
 		private IStorageAccess _storageAccess;
 
+		public string[] GetRefStorageKeys()
+		{
+			if (_keyToReferenceID != null)
+			{
+				string[] keys = new string[_keyToReferenceID.Keys.Count];
+				_keyToReferenceID.Keys.CopyTo(keys, 0);
+				return keys;
+			}
+			return new string[] { };
+		}
+
 		public StorageDictionary(string parentStorageCapsuleID, IStorageAccess storageAccess) : base(parentStorageCapsuleID)
 		{
 			_storageAccess = storageAccess;
@@ -136,7 +147,23 @@ namespace RDP.SaveLoadSystem
 
 		public EditableRefValue GetValueRef(string key)
 		{
-			return _storageAccess.GetEditableRefValue(ParentStorageCapsuleID, key);
+			return _storageAccess.GetEditableRefValue(ParentStorageCapsuleID, GetRefID(key));
+		}
+
+		public EditableRefValue[] GetValueRefs(string key)
+		{
+			object refIDsObject = null;
+			List<EditableRefValue> returnValues = new List<EditableRefValue>();
+			if (!_keyToReferenceID.TryGetValue(key, out refIDsObject))
+			{
+				return returnValues.ToArray();
+			}
+			string[] refIds = refIDsObject.ToString().Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+			for(int i = 0; i < refIds.Length; i++)
+			{
+				returnValues.Add(_storageAccess.GetEditableRefValue(ParentStorageCapsuleID, refIds[i]));
+			}
+			return returnValues.ToArray();
 		}
 
 		public void RemoveValueRef(string key)
@@ -147,6 +174,20 @@ namespace RDP.SaveLoadSystem
 		public void SetValueRef(string key, EditableRefValue refValue)
 		{
 			_keyToReferenceID[key] = refValue.ReferenceID;
+		}
+
+		public void SetValueRefs(string key, EditableRefValue[] refsValues)
+		{
+			string idsCollection = "";
+			for (int i = 0, c = refsValues.Length; i < c; i++)
+			{
+				idsCollection += refsValues[i].ReferenceID;
+				if (i < c - 1)
+				{
+					idsCollection += ",";
+				}
+			}
+			_keyToReferenceID.Add(key, idsCollection);
 		}
 
 		public void RelocateValueRef(string currentKey, string newKey)

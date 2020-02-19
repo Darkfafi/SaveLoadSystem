@@ -10,15 +10,19 @@ namespace RDP.SaveLoadSystem
 
 	public interface IReferenceStorageDictionaryEditor
 	{
+		string[] GetRefStorageKeys();
 		EditableRefValue GetValueRef(string key);
+		EditableRefValue[] GetValueRefs(string key);
 		void RemoveValueRef(string key);
 		void SetValueRef(string key, EditableRefValue refValue);
+		void SetValueRefs(string key, EditableRefValue[] refsValues);
 		void RelocateValueRef(string currentKey, string newKey);
 		EditableRefValue RegisterNewRefInCapsule(Type referenceType);
 	}
 
 	public interface IValueStorageDictionaryEditor
 	{
+		string[] GetValueStorageKeys();
 		void SetValue(string key, object value);
 		object GetValue(string key);
 		void RemoveValue(string key);
@@ -27,7 +31,7 @@ namespace RDP.SaveLoadSystem
 
 	public interface IEditableStorage
 	{
-		EditableRefValue GetEditableRefValue(string storageCapsuleID, string key);
+		EditableRefValue GetEditableRefValue(string storageCapsuleID, string refID);
 		EditableRefValue RegisterNewRefInCapsule(string storageCapsuleID, Type referenceType);
 		bool TryRead(string storageCapsuleID, out ReadStorageResult readStorageResult);
 		List<ReadStorageResult> Read(params string[] storageCapsuleIDs);

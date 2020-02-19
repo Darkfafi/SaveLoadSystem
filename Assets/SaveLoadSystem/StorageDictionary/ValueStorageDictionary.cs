@@ -14,6 +14,17 @@ namespace RDP.SaveLoadSystem
 
 		private Dictionary<string, SaveableValueSection> _keyToNormalValue;
 
+		public string[] GetValueStorageKeys()
+		{
+			if (_keyToNormalValue != null)
+			{
+				string[] keys = new string[_keyToNormalValue.Keys.Count];
+				_keyToNormalValue.Keys.CopyTo(keys, 0);
+				return keys;
+			}
+			return new string[] { };
+		}
+
 		public ValueStorageDictionary(string parentStorageCapsuleID)
 		{
 			ParentStorageCapsuleID = parentStorageCapsuleID;
@@ -45,7 +56,7 @@ namespace RDP.SaveLoadSystem
 			{
 				throw new Exception(string.Format("Can't save list of values under key `{1}` for they are not of a value or primitive type!", values, key));
 			}
-			SaveStruct(key, SaveableArray<T>.From(values));
+			SaveStruct(key, SaveableArray.From(values));
 		}
 
 		public bool LoadValue<T>(string key, out T value) where T : IConvertible, IComparable
@@ -57,10 +68,17 @@ namespace RDP.SaveLoadSystem
 		public bool LoadValues<T>(string key, out T[] values) where T : IConvertible, IComparable
 		{
 			ThrowExceptionWhenISaveable("It is forbidden use this method to load an `ISaveable`! Use `LoadRefs` instead!", typeof(T));
-			SaveableArray<T> saveableArray;
-			if(LoadStruct(key, out saveableArray))
+			SaveableArray<T> oldSaveableArray;
+			SaveableArray newSaveableArray;
+
+			if (LoadStruct(key, out oldSaveableArray))
 			{
-				values = SaveableArray<T>.To(saveableArray);
+				values = SaveableArray<T>.To(oldSaveableArray);
+				return true;
+			}
+			else if (LoadStruct(key, out newSaveableArray))
+			{
+				values = SaveableArray.To<T>(newSaveableArray);
 				return true;
 			}
 
@@ -89,7 +107,7 @@ namespace RDP.SaveLoadSystem
 
 		public void SaveStructs<T>(string key, T[] values) where T : struct
 		{
-			SaveStruct(key, SaveableArray<T>.From(values));
+			SaveStruct(key, SaveableArray.From(values));
 		}
 
 		public bool LoadStruct<T>(string key, out T value) where T : struct
@@ -99,10 +117,17 @@ namespace RDP.SaveLoadSystem
 
 		public bool LoadStructs<T>(string key, out T[] values) where T : struct
 		{
-			SaveableArray<T> saveableArray;
-			if(LoadStruct(key, out saveableArray))
+			SaveableArray<T> oldSaveableArray;
+			SaveableArray newSaveableArray;
+
+			if (LoadStruct(key, out oldSaveableArray))
 			{
-				values = SaveableArray<T>.To(saveableArray);
+				values = SaveableArray<T>.To(oldSaveableArray);
+				return true;
+			}
+			else if (LoadStruct(key, out newSaveableArray))
+			{
+				values = SaveableArray.To<T>(newSaveableArray);
 				return true;
 			}
 
@@ -127,16 +152,24 @@ namespace RDP.SaveLoadSystem
 		public void SaveDict<T, U>(string key, Dictionary<T, U> value)
 		{
 			ThrowExceptionWhenISaveable("It is forbidden to save a dictionary containing an `ISaveable`!", typeof(T), typeof(U));
-			SaveStruct(key, SaveableDict<T, U>.From(value));
+			SaveStruct(key, SaveableDict.From(value));
 		}
 
 		public bool LoadDict<T, U>(string key, out Dictionary<T, U> value)
 		{
 			ThrowExceptionWhenISaveable("It is forbidden to load a dictionary containing an `ISaveable`!", typeof(T), typeof(U));
-			SaveableDict<T, U> saveableDict;
-			if(LoadStruct(key, out saveableDict))
+
+			SaveableDict<T, U> sdOld;
+			SaveableDict sdNew;
+
+			if (LoadStruct(key, out sdOld))
 			{
-				value = SaveableDict<T, U>.To(saveableDict);
+				value = SaveableDict<T, U>.To(sdOld);
+				return true;
+			}
+			else if (LoadStruct(key, out sdNew))
+			{
+				value = SaveableDict.To<T, U>(sdNew);
 				return true;
 			}
 
@@ -215,7 +248,7 @@ namespace RDP.SaveLoadSystem
 
 			if (v.GetValueType() == null)
 			{
-				UnityEngine.Debug.LogError($"No Type found for {v.ValueType}. This means the type was removed or renamed. Please migrate this change!");
+				UnityEngine.Debug.LogError($"No Type found for {key}'s value {value.GetType().Name}. This means the type was removed or renamed. Please migrate this change to the correct type!");
 				return false;
 			}
 
