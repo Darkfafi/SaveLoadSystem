@@ -1,18 +1,18 @@
 ﻿using Internal;
-using UnityEditor;
-using System.Reflection;
-using System;
-using System.Linq;
-using System.Collections.Generic;
-using UnityEngine;
 using RDP.SaveLoadSystem.Internal.Utils;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using UnityEditor;
+using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
 	public class StorageInspectorEditor : EditorWindow
 	{
 		private Storage _currentlyViewingStorage = null;
-		private ReadStorageResult[] _results = null;
+		private List<StoringUIItem> _capsuleUIItems = new List<StoringUIItem>();
 
 		private List<IStorageCapsule> _iStorageCapsuleInstances = new List<IStorageCapsule>();
 		private List<string> _capsuleIDs = new List<string>();
@@ -54,14 +54,12 @@ namespace RDP.SaveLoadSystem
 				}
 			}
 
-			if (_results != null)
+			if (_capsuleUIItems != null)
 			{
 				_scroll = EditorGUILayout.BeginScrollView(_scroll);
-				for(int i = 0; i < _results.Length; i++)
+				for(int i = 0; i < _capsuleUIItems.Count; i++)
 				{
-					ReadStorageResult result = _results[i];
-					EditorGUILayout.LabelField("---- " + result.CapsuleID + " ----");
-					RenderStorageGUI(result.CapsuleStorage, i);
+					_capsuleUIItems[i].RenderGUI(0);
 				}
 				EditorGUILayout.EndScrollView();
 			}
@@ -71,7 +69,7 @@ namespace RDP.SaveLoadSystem
 		{
 			_iStorageCapsuleInstances.Clear();
 			_capsuleIDs.Clear();
-			_results = null;
+			_capsuleUIItems = null;
 			_currentlyViewingStorage = null;
 		}
 
@@ -79,13 +77,20 @@ namespace RDP.SaveLoadSystem
 		{
 			RefreshStorageCapsuleInstances();
 			_currentlyViewingStorage = new Storage(path, encodingType, _iStorageCapsuleInstances.ToArray());
-			_results = _currentlyViewingStorage.Read(_capsuleIDs.ToArray()).ToArray();
+			ReadStorageResult[]  results = _currentlyViewingStorage.Read(_capsuleIDs.ToArray()).ToArray();
+
+			for (int i = 0; i < results.Length; i++)
+			{
+				ReadStorageResult result = results[i];
+				_capsuleUIItems.Add(new StoringUIItem(result.CapsuleID, result.CapsuleStorage));
+			}
 		}
 
 		private void RefreshStorageCapsuleInstances()
 		{
 			_iStorageCapsuleInstances.Clear();
 			_capsuleIDs.Clear();
+			_capsuleUIItems.Clear();
 			Type[] storageCapsuleTypes = Assembly.GetAssembly(typeof(IStorageCapsule)).GetTypes().Where(x => x.GetInterfaces().Contains(typeof(IStorageCapsule))).ToArray();
 			for(int i = 0; i < storageCapsuleTypes.Length; i++)
 			{
@@ -98,65 +103,154 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
-		private bool RenderStorageGUI(IStorageDictionaryEditor storageDictionary, int index, int padding = 0)
+		private class RefUIItem : StoringUIItem
 		{
-			if (storageDictionary == null)
+			private EditableRefValue _ref;
+
+			public RefUIItem(string refKey, EditableRefValue refValue) : base("- " + refKey, refValue.Storage)
 			{
-				return false;
+				_ref = refValue;
 			}
 
-			GUIStyle masterStyle = new GUIStyle(GUI.skin.label);
-			masterStyle.padding.left = padding + 10;
-
-			GUIStyle childrenStyle = new GUIStyle(GUI.skin.label);
-			childrenStyle.padding.left = masterStyle.padding.left + 10;
-
-			string[] valKeys = storageDictionary.GetValueStorageKeys();
-
-			for (int i = 0; i < valKeys.Length; i++)
+			protected override void OnRenderGUI(int layer)
 			{
-				string valKey = valKeys[i];
-				object val = storageDictionary.GetValue(valKey);
+				EditorGUILayout.LabelField(string.Concat("- ID: ", _ref.ReferenceID));
+				EditorGUILayout.LabelField(string.Concat("- Type: ", _ref.ReferenceType));
+				EditorGUILayout.LabelField(string.Concat("- Storage: ", _ref.Storage == null ? "Empty" : ""));
+				base.OnRenderGUI(layer);
+			}
+		}
 
-				if (val.GetType() == typeof(SaveableDict))
+		private class StoringUIItem : UIItem
+		{
+			private List<RefUIItem> _nestedRefs = new List<RefUIItem>();
+			private List<UIItem> _nestedValues = new List<UIItem>();
+
+			private IStorageDictionaryEditor _storage;
+
+			public StoringUIItem(string id, IStorageDictionaryEditor storage) : base(id, false)
+			{
+				_storage = storage;
+				if (_storage != null)
 				{
-					SaveableDict dict = (SaveableDict)val;
-					for(int j = 0; j < dict.Items.Length; j++)
+					string[] valKeys = _storage.GetValueStorageKeys();
+					for (int i = 0; i < valKeys.Length; i++)
 					{
-						DictItem item = dict.Items[j];
-						EditorGUILayout.LabelField(string.Concat("- ", item.KeySection.ValueType, ": ", item.ValueSection.ValueType), masterStyle);
-						EditorGUILayout.LabelField(string.Concat("  ", item.KeySection.ValueString, ": ", item.ValueSection.ValueString), childrenStyle);
+						string valKey = valKeys[i];
+						object val = _storage.GetValue(valKey);
+
+						if (val.GetType() == typeof(SaveableDict))
+						{
+							_nestedValues.Add(new DictElementItem(valKey, (SaveableDict)val));
+						}
+						else
+						{
+							_nestedValues.Add(new ElementItem(valKey, val));
+						}
+					}
+
+					string[] refKeys = _storage.GetRefStorageKeys();
+					for (int i = 0; i < refKeys.Length; i++)
+					{
+						string tRefKey = refKeys[i];
+						EditableRefValue[] refsVals = _storage.GetValueRefs(tRefKey);
+						for (int j = 0; j < refsVals.Length; j++)
+						{
+							EditableRefValue refVal = refsVals[j];
+							_nestedRefs.Add(new RefUIItem(tRefKey, refVal));
+						}
 					}
 				}
-				else
-				{
-					EditorGUILayout.LabelField(string.Concat("- ", valKey, ": ", val.ToString()), masterStyle);
-				}
 			}
 
-			string[] refKeys = storageDictionary.GetRefStorageKeys();
-
-			for (int i = 0; i < refKeys.Length; i++)
+			protected override void OnRenderGUI(int layer)
 			{
-				string refKey = refKeys[i];
-				EditorGUILayout.LabelField(string.Concat(refKey, ": "), masterStyle);
-				List<EditableRefValue> refsVals = new List<EditableRefValue>();
-				refsVals.Add(storageDictionary.GetValueRef(refKey));
-				refsVals.AddRange(storageDictionary.GetValueRefs(refKey));
-				for (int j = 0; j < refsVals.Count; j++)
+				for (int i = 0; i < _nestedValues.Count; i++)
 				{
-					EditableRefValue refVal = refsVals[j];
-					if (!string.IsNullOrEmpty(refVal.ReferenceID))
-					{
-						EditorGUILayout.LabelField(string.Concat("- ID: ", refVal.ReferenceID), childrenStyle);
-						EditorGUILayout.LabelField(string.Concat("- Type: ", refVal.ReferenceType), childrenStyle);
-						EditorGUILayout.LabelField(string.Concat("- Storage: ", refVal.Storage == null ? "Empty" : ""), childrenStyle);
-						RenderStorageGUI(refVal.Storage, index, childrenStyle.padding.left);
-					}
+					_nestedValues[i].RenderGUI(layer + 1);
+				}
+
+				for (int i = 0; i < _nestedRefs.Count; i++)
+				{
+					_nestedRefs[i].RenderGUI(layer + 1);
+				}
+			}
+		}
+
+		private class ElementItem : UIItem
+		{
+			private object _value;
+
+			public ElementItem(string key, object value) : base("- " + key, true)
+			{
+				_value = value;
+			}
+
+			protected override void OnRenderGUI(int layer)
+			{
+				EditorGUILayout.LabelField(string.Concat(_value.ToString()));
+			}
+		}
+
+		private class DictElementItem : UIItem
+		{
+			private SaveableDict _dict;
+
+			public DictElementItem(string key, SaveableDict dict) : base("- "  + key, false)
+			{
+				_dict = dict;
+			}
+
+			protected override void OnRenderGUI(int layer)
+			{
+				for (int j = 0; j < _dict.Items.Length; j++)
+				{
+					DictItem item = _dict.Items[j];
+					GUILayout.BeginVertical(GUI.skin.box);
+					EditorGUILayout.LabelField(string.Concat("- ", item.KeySection.ValueType, ": ", item.ValueSection.ValueType));
+					EditorGUILayout.LabelField(string.Concat("  ", item.KeySection.ValueString, ": ", item.ValueSection.ValueString));
+					GUILayout.EndVertical();
+				}
+			}
+		}
+
+		private abstract class UIItem
+		{
+			public bool IsOpen
+			{
+				get; private set;
+			}
+
+			public string Title
+			{
+				get; private set;
+			}
+
+			public UIItem(string title, bool defaultIsOpenValue)
+			{
+				Title = title;
+				IsOpen = defaultIsOpenValue;
+			}
+
+			public void RenderGUI(int layer)
+			{
+				GUILayout.BeginHorizontal();
+				GUILayout.Space(layer * 10);
+				IsOpen = EditorGUILayout.Foldout(IsOpen, Title);
+				GUILayout.EndHorizontal();
+
+				if (IsOpen)
+				{
+					GUILayout.BeginHorizontal();
+					GUILayout.Space(layer * 20);
+					GUILayout.BeginVertical(GUI.skin.box);
+					OnRenderGUI(layer);
+					GUILayout.EndVertical();
+					GUILayout.EndHorizontal();
 				}
 			}
 
-			return true;
+			protected abstract void OnRenderGUI(int layer);
 		}
 	}
 }
