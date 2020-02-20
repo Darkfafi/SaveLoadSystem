@@ -447,16 +447,7 @@ namespace RDP.SaveLoadSystem
 						string referenceTypeString;
 						if(storageForRef.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out referenceTypeString))
 						{
-							Type refType;
-							try
-							{
-								refType = Type.GetType(referenceTypeString);
-							}
-							catch
-							{
-								refType = null;
-							}
-							return new EditableRefValue(refID, refType, storageForRef);
+							return new EditableRefValue(refID, referenceTypeString, storageForRef);
 						}
 					}
 					break;
@@ -478,7 +469,7 @@ namespace RDP.SaveLoadSystem
 					StorageDictionary storageForRef = new StorageDictionary(storageCapsuleID, this);
 					storageForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceType.AssemblyQualifiedName);
 					string randomOnFlyID = Guid.NewGuid().ToString("N");
-					editableRefValue = new EditableRefValue(randomOnFlyID, referenceType, storageForRef);
+					editableRefValue = new EditableRefValue(randomOnFlyID, referenceType.AssemblyQualifiedName, storageForRef);
 					capsuleToEdit = item.Key;
 					break;
 				}

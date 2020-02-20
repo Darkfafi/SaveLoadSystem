@@ -54,7 +54,7 @@ namespace RDP.SaveLoadSystem
 	public struct EditableRefValue
 	{
 		public string ReferenceID;
-		public Type ReferenceType;
+		public string ReferenceTypeString;
 		public IStorageDictionaryEditor Storage;
 
 		public bool IsValidRefValue
@@ -62,12 +62,26 @@ namespace RDP.SaveLoadSystem
 			get; private set;
 		}
 
-		public EditableRefValue(string refID, Type refType, IStorageDictionaryEditor storageEditor)
+		public Type ReferenceType
+		{
+			get; private set;
+		}
+
+		public EditableRefValue(string refID, string refTypeString, IStorageDictionaryEditor storageEditor)
 		{
 			ReferenceID = refID;
-			ReferenceType = refType;
+			ReferenceTypeString = refTypeString;
 			Storage = storageEditor;
 			IsValidRefValue = true;
+
+			try
+			{
+				ReferenceType = Type.GetType(ReferenceTypeString);
+			}
+			catch
+			{
+				ReferenceType = null;
+			}
 		}
 	}
 }

@@ -107,6 +107,14 @@ namespace RDP.SaveLoadSystem
 		{
 			private EditableRefValue _ref;
 
+			public override bool IsCorrupt
+			{
+				get
+				{
+					return base.IsCorrupt || _ref.ReferenceType == null;
+				}
+			}
+
 			public RefUIItem(string refKey, EditableRefValue refValue) : base("- " + refKey, refValue.Storage)
 			{
 				_ref = refValue;
@@ -114,8 +122,21 @@ namespace RDP.SaveLoadSystem
 
 			protected override void OnRenderGUI(int layer)
 			{
+				GUIStyle typeStyle = new GUIStyle(GUI.skin.label);
+				string typeDisplay = string.Empty;
+
+				if (_ref.ReferenceType == null)
+				{
+					typeStyle.normal.textColor = Color.red;
+					typeDisplay = _ref.ReferenceTypeString;
+				}
+				else
+				{
+					typeDisplay = _ref.ReferenceType.ToString();
+				}
+
 				EditorGUILayout.LabelField(string.Concat("- ID: ", _ref.ReferenceID));
-				EditorGUILayout.LabelField(string.Concat("- Type: ", _ref.ReferenceType));
+				EditorGUILayout.LabelField(string.Concat("- Type: ", typeDisplay), typeStyle);
 				EditorGUILayout.LabelField(string.Concat("- Storage: ", _ref.Storage == null ? "Empty" : ""));
 				base.OnRenderGUI(layer);
 			}
@@ -127,6 +148,14 @@ namespace RDP.SaveLoadSystem
 			private List<UIItem> _nestedValues = new List<UIItem>();
 
 			private IStorageDictionaryEditor _storage;
+
+			public override bool IsCorrupt
+			{
+				get
+				{
+					return _nestedValues.Any(x => x.IsCorrupt) || _nestedRefs.Any(x => x.IsCorrupt);
+				}
+			}
 
 			public StoringUIItem(string id, IStorageDictionaryEditor storage) : base(id, false)
 			{
@@ -181,6 +210,14 @@ namespace RDP.SaveLoadSystem
 		{
 			private object _value;
 
+			public override bool IsCorrupt
+			{
+				get
+				{
+					return false;
+				}
+			}
+
 			public ElementItem(string key, object value) : base("- " + key, true)
 			{
 				_value = value;
@@ -201,13 +238,31 @@ namespace RDP.SaveLoadSystem
 				_dict = dict;
 			}
 
+			public override bool IsCorrupt
+			{
+				get
+				{
+					return _dict.Items.Any(x => !IsTypeValid(x.KeySection.ValueType) || !IsTypeValid(x.ValueSection.ValueType));
+				}
+			}
+
 			protected override void OnRenderGUI(int layer)
 			{
 				for (int j = 0; j < _dict.Items.Length; j++)
 				{
 					DictItem item = _dict.Items[j];
+
+					bool isCorrupt = !IsTypeValid(item.KeySection.ValueType) || !IsTypeValid(item.ValueSection.ValueType);
+
+					GUIStyle typeLabelStyle = new GUIStyle(GUI.skin.label);
+
+					if (isCorrupt)
+					{
+						typeLabelStyle.normal.textColor = Color.red;
+					}
+
 					GUILayout.BeginVertical(GUI.skin.box);
-					EditorGUILayout.LabelField(string.Concat("- ", item.KeySection.ValueType, ": ", item.ValueSection.ValueType));
+					EditorGUILayout.LabelField(string.Concat("- ", item.KeySection.ValueType, ": ", item.ValueSection.ValueType), typeLabelStyle);
 					EditorGUILayout.LabelField(string.Concat("  ", item.KeySection.ValueString, ": ", item.ValueSection.ValueString));
 					GUILayout.EndVertical();
 				}
@@ -226,6 +281,13 @@ namespace RDP.SaveLoadSystem
 				get; private set;
 			}
 
+			public abstract bool IsCorrupt
+			{
+				get;
+			}
+
+			private Stack<Color> _colorStack = new Stack<Color>();
+
 			public UIItem(string title, bool defaultIsOpenValue)
 			{
 				Title = title;
@@ -236,7 +298,15 @@ namespace RDP.SaveLoadSystem
 			{
 				GUILayout.BeginHorizontal();
 				GUILayout.Space(layer * 10);
-				IsOpen = EditorGUILayout.Foldout(IsOpen, Title);
+
+				GUIStyle foldoutStyle = new GUIStyle(EditorStyles.foldout);
+
+				if(IsCorrupt)
+				{
+					foldoutStyle.normal.textColor = Color.red;
+				}
+
+				IsOpen = EditorGUILayout.Foldout(IsOpen, Title + (IsCorrupt ? " [!]" : ""), foldoutStyle);
 				GUILayout.EndHorizontal();
 
 				if (IsOpen)
@@ -251,6 +321,21 @@ namespace RDP.SaveLoadSystem
 			}
 
 			protected abstract void OnRenderGUI(int layer);
+
+			protected bool IsTypeValid(string typeString)
+			{
+				if (string.IsNullOrEmpty(typeString))
+					return false;
+
+				try
+				{
+					return Type.GetType(typeString) != null;
+				}
+				catch
+				{
+					return false;
+				}
+			}
 		}
 	}
 }
