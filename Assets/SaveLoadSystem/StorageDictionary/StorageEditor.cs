@@ -24,6 +24,7 @@ namespace RDP.SaveLoadSystem.Internal
 	{
 		string[] GetValueStorageKeys();
 		void SetValue(string key, object value);
+		void SetValueSection(string key, SaveableValueSection section);
 		SaveableValueSection GetValueSection(string key);
 		void RemoveValue(string key);
 		void RelocateValue(string currentKey, string newKey);

@@ -1,6 +1,5 @@
 ﻿using RDP.SaveLoadSystem.Internal;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
@@ -24,6 +23,7 @@ namespace RDP.SaveLoadSystem
 						migration.Do(storageResult);
 						// Migrator Level is the one coming after this one, may it be the next loop or in the future
 						migratorLevelIndex = i + 1;
+						UnityEngine.Debug.Log(migration.GetType().FullName + ".Do();");
 					}
 					if (preMigrationLevel != migratorLevelIndex)
 					{
@@ -50,6 +50,7 @@ namespace RDP.SaveLoadSystem
 						migration.Undo(storageResult);
 						// Migrator Level is set to target the one last undone
 						migratorLevelIndex = i;
+						UnityEngine.Debug.Log(migration.GetType().FullName + ".Undo();");
 					}
 					if (preMigrationLevel != migratorLevelIndex)
 					{

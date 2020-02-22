@@ -15,6 +15,11 @@ namespace RDP.SaveLoadSystem
 
 		private List<string> _keysToKeep = new List<string>();
 
+		public bool HasRefKey(string key)
+		{
+			return _keyToReferenceID.ContainsKey(key);
+		}
+
 		public string[] GetRefStorageKeys()
 		{
 			if (_keyToReferenceID != null)
@@ -57,6 +62,8 @@ namespace RDP.SaveLoadSystem
 			}
 
 			_keyToReferenceID.Add(key, _storageAccess.ActiveRefHandler.GetIdForReference(value));
+			_keysToKeep.Remove(key);
+			SetKeysToKeep();
 		}
 
 		void IStorageReferenceSaver.SaveRefs<T>(string key, T[] values, bool allowNull)
@@ -83,6 +90,8 @@ namespace RDP.SaveLoadSystem
 			}
 
 			_keyToReferenceID.Add(key, idsCollection);
+			_keysToKeep.Remove(key);
+			SetKeysToKeep();
 		}
 
 		bool IStorageReferenceLoader.LoadRef<T>(string key, StorageLoadHandler<T> refLoadedCallback)
@@ -187,7 +196,7 @@ namespace RDP.SaveLoadSystem
 			if (_keysToKeep.Contains(key))
 				_keysToKeep.Remove(key);
 
-			SetValue(REF_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
+			SetKeysToKeep();
 		}
 
 		public void SetValueRef(string key, EditableRefValue refValue)
@@ -197,7 +206,7 @@ namespace RDP.SaveLoadSystem
 			if (!_keysToKeep.Contains(key))
 				_keysToKeep.Add(key);
 
-			SetValue(REF_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
+			SetKeysToKeep();
 		}
 
 		public void SetValueRefs(string key, EditableRefValue[] refsValues)
@@ -216,7 +225,7 @@ namespace RDP.SaveLoadSystem
 			if (!_keysToKeep.Contains(key))
 				_keysToKeep.Add(key);
 
-			SetValue(REF_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
+			SetKeysToKeep();
 		}
 
 		public void RelocateValueRef(string currentKey, string newKey)
@@ -233,6 +242,11 @@ namespace RDP.SaveLoadSystem
 		public EditableRefValue RegisterNewRefInCapsule(Type referenceType)
 		{
 			return _storageAccess.RegisterNewRefInCapsule(ParentStorageCapsuleID, referenceType);
+		}
+
+		private void SetKeysToKeep()
+		{
+			SetValue(REF_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
 		}
 	}
 }

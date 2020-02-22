@@ -28,6 +28,11 @@ namespace RDP.SaveLoadSystem
 			return new string[] { };
 		}
 
+		public bool HasValueKey(string key)
+		{
+			return _keyToNormalValue.ContainsKey(key);
+		}
+
 		public bool ShouldKeepValueKey(string key)
 		{
 			return _keysToKeep.Contains(key);
@@ -207,13 +212,7 @@ namespace RDP.SaveLoadSystem
 				_keyToNormalValue.Add(key, new SaveableValueSection(value, value.GetType()));
 			}
 
-			if (key != VALUE_KEYS_TO_KEEP_KEY)
-			{
-				if (!_keysToKeep.Contains(key))
-					_keysToKeep.Add(key);
-
-				SetValue(VALUE_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
-			}
+			SetValueSection(key, new SaveableValueSection(value, value.GetType()));
 		}
 
 		public SaveableValueSection GetValueSection(string key)
@@ -226,6 +225,26 @@ namespace RDP.SaveLoadSystem
 			return default;
 		}
 
+		public void SetValueSection(string key, SaveableValueSection section)
+		{
+			if (_keyToNormalValue.ContainsKey(key))
+			{
+				_keyToNormalValue[key] = section;
+			}
+			else
+			{
+				_keyToNormalValue.Add(key, section);
+			}
+
+			if (key != VALUE_KEYS_TO_KEEP_KEY)
+			{
+				if (!_keysToKeep.Contains(key))
+					_keysToKeep.Add(key);
+
+				SetKeysToKeep();
+			}
+		}
+
 		public void RemoveValue(string key)
 		{
 			_keyToNormalValue.Remove(key);
@@ -235,7 +254,7 @@ namespace RDP.SaveLoadSystem
 				_keysToKeep.Remove(key);
 			}
 
-			SetValue(VALUE_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
+			SetKeysToKeep();
 		}
 
 		public void RelocateValue(string currentKey, string newKey)
@@ -262,6 +281,7 @@ namespace RDP.SaveLoadSystem
 		private void Save(string key, object value, Type specifiedType)
 		{
 			_keyToNormalValue.Add(key, new SaveableValueSection(value, specifiedType));
+			_keysToKeep.Remove(key);
 		}
 
 		private bool Load<T>(string key, out T value)
@@ -298,6 +318,11 @@ namespace RDP.SaveLoadSystem
 					throw new Exception(message);
 				}
 			}
+		}
+
+		private void SetKeysToKeep()
+		{
+			SetValue(VALUE_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
 		}
 	}
 }

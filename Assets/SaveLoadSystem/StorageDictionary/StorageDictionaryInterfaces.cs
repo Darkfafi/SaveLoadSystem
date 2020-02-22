@@ -24,6 +24,7 @@ namespace RDP.SaveLoadSystem
 
 	public interface IStorageReferenceLoader
 	{
+		bool HasRefKey(string key);
 		bool LoadRef<T>(string key, StorageLoadHandler<T> refAvailableCallback) where T : class, ISaveable;
 		bool LoadRefs<T>(string key, StorageLoadMultipleHandler<T> refsAvailableCallback) where T : class, ISaveable;
 	}
@@ -39,6 +40,7 @@ namespace RDP.SaveLoadSystem
 
 	public interface IStorageValueLoader
 	{
+		bool HasValueKey(string key);
 		bool LoadValue<T>(string key, out T value) where T : IConvertible, IComparable;
 		bool LoadValues<T>(string key, out T[] values) where T : IConvertible, IComparable;
 		bool LoadStruct<T>(string key, out T value) where T : struct;

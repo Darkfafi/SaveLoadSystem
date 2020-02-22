@@ -163,27 +163,28 @@ namespace RDP.SaveLoadSystem
 							StorageDictionary storageDictForRef = new StorageDictionary(pair.Key.ID, this);
 							referencesSaved.Add(refID, storageDictForRef);
 							storageDictForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceInstance.GetType().AssemblyQualifiedName);
-							if(pair.Value.TryGetValue(refID, out StorageDictionary oldData))
+							referenceInstance.Save(storageDictForRef);
+
+							if (pair.Value.TryGetValue(refID, out StorageDictionary oldData))
 							{
-								foreach(var valueKey in oldData.GetValueStorageKeys())
+								foreach (var valueKey in oldData.GetValueStorageKeys())
 								{
-									if(oldData.ShouldKeepValueKey(valueKey))
+									if (oldData.ShouldKeepValueKey(valueKey) && !storageDictForRef.HasValueKey(valueKey))
 									{
 										storageDictForRef.SetValue(valueKey, oldData.GetValueSection(valueKey).GetValue());
 									}
 								}
 
-								foreach(var refKey in oldData.GetRefStorageKeys())
+								foreach (var refKey in oldData.GetRefStorageKeys())
 								{
-									if(oldData.ShouldKeepRefKey(refKey))
+									if (oldData.ShouldKeepRefKey(refKey) && !storageDictForRef.HasRefKey(refKey))
 									{
 										storageDictForRef.SetValueRef(refKey, oldData.GetValueRef(refKey));
 									}
 								}
 							}
-							referenceInstance.Save(storageDictForRef);
 
-							if(refID != ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID)
+							if (refID != ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID)
 								_alreadySavedReferencesToOriginCapsuleMap.Add(refID, pair.Key);
 						}
 					};
