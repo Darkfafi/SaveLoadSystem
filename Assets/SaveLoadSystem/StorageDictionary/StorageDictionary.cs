@@ -1,4 +1,5 @@
 ﻿using RDP.SaveLoadSystem.Internal;
+using RDP.SaveLoadSystem.Internal.Utils;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,8 +8,12 @@ namespace RDP.SaveLoadSystem
 {
 	public class StorageDictionary : ValueStorageDictionary, IStorageSaver, IStorageLoader, IStorageDictionaryEditor
 	{
+		public const string REF_KEYS_TO_KEEP_KEY = "RESERVED_REF_KEYS_TO_KEEP_KEY_RESERVED";
+
 		private Dictionary<string, object> _keyToReferenceID;
 		private IStorageAccess _storageAccess;
+
+		private List<string> _keysToKeep = new List<string>();
 
 		public string[] GetRefStorageKeys()
 		{
@@ -21,6 +26,11 @@ namespace RDP.SaveLoadSystem
 			return new string[] { };
 		}
 
+		public bool ShouldKeepRefKey(string key)
+		{
+			return _keysToKeep.Contains(key);
+		}
+
 		public StorageDictionary(string parentStorageCapsuleID, IStorageAccess storageAccess) : base(parentStorageCapsuleID)
 		{
 			_storageAccess = storageAccess;
@@ -31,6 +41,10 @@ namespace RDP.SaveLoadSystem
 		{
 			_storageAccess = storageAccess;
 			_keyToReferenceID = loadedRefs;
+			if (LoadValues(REF_KEYS_TO_KEEP_KEY, out string[] keysToKeep))
+			{
+				_keysToKeep = new List<string>(keysToKeep);
+			}
 		}
 
 		void IStorageReferenceSaver.SaveRef<T>(string key, T value, bool allowNull)
@@ -169,11 +183,21 @@ namespace RDP.SaveLoadSystem
 		public void RemoveValueRef(string key)
 		{
 			_keyToReferenceID.Remove(key);
+
+			if (_keysToKeep.Contains(key))
+				_keysToKeep.Remove(key);
+
+			SetValue(REF_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
 		}
 
 		public void SetValueRef(string key, EditableRefValue refValue)
 		{
 			_keyToReferenceID[key] = refValue.ReferenceID;
+
+			if (!_keysToKeep.Contains(key))
+				_keysToKeep.Add(key);
+
+			SetValue(REF_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
 		}
 
 		public void SetValueRefs(string key, EditableRefValue[] refsValues)
@@ -188,6 +212,11 @@ namespace RDP.SaveLoadSystem
 				}
 			}
 			_keyToReferenceID.Add(key, idsCollection);
+
+			if (!_keysToKeep.Contains(key))
+				_keysToKeep.Add(key);
+
+			SetValue(REF_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
 		}
 
 		public void RelocateValueRef(string currentKey, string newKey)

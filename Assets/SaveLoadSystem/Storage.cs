@@ -163,6 +163,24 @@ namespace RDP.SaveLoadSystem
 							StorageDictionary storageDictForRef = new StorageDictionary(pair.Key.ID, this);
 							referencesSaved.Add(refID, storageDictForRef);
 							storageDictForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceInstance.GetType().AssemblyQualifiedName);
+							if(pair.Value.TryGetValue(refID, out StorageDictionary oldData))
+							{
+								foreach(var valueKey in oldData.GetValueStorageKeys())
+								{
+									if(oldData.ShouldKeepValueKey(valueKey))
+									{
+										storageDictForRef.SetValue(valueKey, oldData.GetValueSection(valueKey).GetValue());
+									}
+								}
+
+								foreach(var refKey in oldData.GetRefStorageKeys())
+								{
+									if(oldData.ShouldKeepRefKey(refKey))
+									{
+										storageDictForRef.SetValueRef(refKey, oldData.GetValueRef(refKey));
+									}
+								}
+							}
 							referenceInstance.Save(storageDictForRef);
 
 							if(refID != ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID)
@@ -275,9 +293,15 @@ namespace RDP.SaveLoadSystem
 				Flush(storageCapsuleIDs);
 		}
 
+		public void FlushRefresh(params string[] storageCapsuleIDs)
+		{
+			Flush(storageCapsuleIDs);
+			RefreshCachedData(storageCapsuleIDs);
+		}
+
 		public void Flush(params string[] storageCapsuleIDs)
 		{
-			foreach(var capsuleMapItem in _cachedStorageCapsules)
+			foreach (var capsuleMapItem in _cachedStorageCapsules)
 			{
 				if(storageCapsuleIDs != null && storageCapsuleIDs.Length > 0 && Array.IndexOf(storageCapsuleIDs, capsuleMapItem.Key) >= 0)
 					continue;

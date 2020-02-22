@@ -7,6 +7,14 @@ namespace RDP.SaveLoadSystem.Internal
 {
 	public static class StorageKeySearcher
 	{
+		private static Dictionary<string, StorageKeyEntry> EXCPECTION_KEY_ENTRIES = new Dictionary<string, StorageKeyEntry>()
+		{
+			{ Storage.STORAGE_REFERENCE_TYPE_STRING_KEY,  new StorageKeyEntry(Storage.STORAGE_REFERENCE_TYPE_STRING_KEY, typeof(ISaveable), false) },
+			{ Migrator.MIGRATOR_INDEX_KEY,  new StorageKeyEntry(Migrator.MIGRATOR_INDEX_KEY, typeof(int), true) },
+			{ ValueStorageDictionary.VALUE_KEYS_TO_KEEP_KEY,  new StorageKeyEntry(ValueStorageDictionary.VALUE_KEYS_TO_KEEP_KEY, typeof(string[]), true) },
+			{ StorageDictionary.REF_KEYS_TO_KEEP_KEY,  new StorageKeyEntry(StorageDictionary.REF_KEYS_TO_KEEP_KEY, typeof(string[]), true) },
+		};
+
 		public static Dictionary<Type, Dictionary<string, StorageKeyEntry>> GetSaveablesToKeyEntries()
 		{
 			Dictionary<Type, Dictionary<string, StorageKeyEntry>> entries = new Dictionary<Type, Dictionary<string, StorageKeyEntry>>();
@@ -26,7 +34,12 @@ namespace RDP.SaveLoadSystem.Internal
 
 			FieldInfo[] fields = saveableType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
 			Dictionary<string, StorageKeyEntry> keyEntries = new Dictionary<string, StorageKeyEntry>();
-			keyEntries.Add(Storage.STORAGE_REFERENCE_TYPE_STRING_KEY, new StorageKeyEntry(Storage.STORAGE_REFERENCE_TYPE_STRING_KEY, typeof(ISaveable), false));
+
+			foreach(var exceptionPair in EXCPECTION_KEY_ENTRIES)
+			{
+				keyEntries.Add(exceptionPair.Key, exceptionPair.Value);
+			}
+
 			foreach (FieldInfo fInfo in fields)
 			{
 				StorageKeyAttribute keyAttribute = fInfo.GetCustomAttribute<StorageKeyAttribute>(true);
@@ -42,7 +55,6 @@ namespace RDP.SaveLoadSystem.Internal
 		public struct StorageKeyEntry
 		{
 			public string StorageKey;
-			public Type ExpectedType;
 			public bool IsOptional;
 
 			public bool IsValid
@@ -50,28 +62,36 @@ namespace RDP.SaveLoadSystem.Internal
 				get; private set;
 			}
 
+			private Type _expectedType;
+
 			public StorageKeyEntry(string storageKey, Type expectedType, bool isOptional)
 			{
 				StorageKey = storageKey;
-				ExpectedType = expectedType;
+				_expectedType = expectedType;
 				IsOptional = isOptional;
 				IsValid = true;
 			}
 
-			public bool IsOfExpectedType(string targetTypeString)
+			public Type GetExpectedType()
 			{
-				Type safeType;
+				return _expectedType;
+			}
 
+			public Type GetExpectedType(string targetTypeString)
+			{
 				try
 				{
-					safeType = Type.GetType(targetTypeString);
+					return Type.GetType(targetTypeString);
 				}
 				catch
 				{
-					safeType = null;
+					return null;
 				}
+			}
 
-				return IsOfExpectedType(safeType);
+			public bool IsOfExpectedType(string targetTypeString)
+			{
+				return IsOfExpectedType(GetExpectedType(targetTypeString));
 			}
 
 			public bool IsOfExpectedType(Type targetType)
@@ -79,14 +99,14 @@ namespace RDP.SaveLoadSystem.Internal
 				if(targetType == null)
 					return false;
 
-				return ExpectedType.IsAssignableFrom(targetType);
+				return _expectedType.IsAssignableFrom(targetType);
 			}
 
 			public bool TryGetExpectedDictTypes(out Type keyType, out Type valueType)
 			{
-				if (!ExpectedType.IsInterface && ExpectedType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+				if (!_expectedType.IsInterface && _expectedType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
 				{
-					Type[] arguments = ExpectedType.GetGenericArguments();
+					Type[] arguments = _expectedType.GetGenericArguments();
 					keyType = arguments[0];
 					valueType = arguments[1];
 					return true;
@@ -94,6 +114,18 @@ namespace RDP.SaveLoadSystem.Internal
 
 				keyType = null;
 				valueType = null;
+				return false;
+			}
+
+			public bool TryGetExpectedArrayType(out Type arrayType)
+			{
+				if (_expectedType.IsArray)
+				{
+					arrayType = _expectedType.GetElementType();
+					return true;
+				}
+
+				arrayType = null;
 				return false;
 			}
 		}

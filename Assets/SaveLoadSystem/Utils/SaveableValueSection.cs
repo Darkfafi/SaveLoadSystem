@@ -18,6 +18,14 @@ namespace RDP.SaveLoadSystem.Internal
 			ValueType = specifiedType.AssemblyQualifiedName;
 		}
 
+		public bool IsValid
+		{
+			get
+			{
+				return !string.IsNullOrEmpty(ValueType);
+			}
+		}
+
 		public object GetValue()
 		{
 			return PrimitiveToValueParserUtility.FromJSON(ValueString, GetValueType());

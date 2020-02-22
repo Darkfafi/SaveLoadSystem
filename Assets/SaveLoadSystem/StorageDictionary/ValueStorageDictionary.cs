@@ -7,12 +7,15 @@ namespace RDP.SaveLoadSystem
 {
 	public class ValueStorageDictionary : IStorageValueSaver, IStorageValueLoader, IValueStorageDictionaryEditor
 	{
+		public const string VALUE_KEYS_TO_KEEP_KEY = "RESERVED_VALUE_KEYS_TO_KEEP_KEY_RESERVED";
+
 		public string ParentStorageCapsuleID
 		{
 			get; private set;
 		}
 
 		private Dictionary<string, SaveableValueSection> _keyToNormalValue;
+		private List<string> _keysToKeep = new List<string>();
 
 		public string[] GetValueStorageKeys()
 		{
@@ -25,6 +28,11 @@ namespace RDP.SaveLoadSystem
 			return new string[] { };
 		}
 
+		public bool ShouldKeepValueKey(string key)
+		{
+			return _keysToKeep.Contains(key);
+		}
+
 		public ValueStorageDictionary(string parentStorageCapsuleID)
 		{
 			ParentStorageCapsuleID = parentStorageCapsuleID;
@@ -35,6 +43,10 @@ namespace RDP.SaveLoadSystem
 		{
 			ParentStorageCapsuleID = parentStorageCapsuleID;
 			_keyToNormalValue = loadedValues;
+			if(LoadValues(VALUE_KEYS_TO_KEEP_KEY, out string[] keysToKeep))
+			{
+				_keysToKeep = new List<string>(keysToKeep);
+			}
 		}
 
 		public void SaveValue<T>(string key, T value) where T : IConvertible, IComparable
@@ -194,22 +206,36 @@ namespace RDP.SaveLoadSystem
 			{
 				_keyToNormalValue.Add(key, new SaveableValueSection(value, value.GetType()));
 			}
+
+			if (key != VALUE_KEYS_TO_KEEP_KEY)
+			{
+				if (!_keysToKeep.Contains(key))
+					_keysToKeep.Add(key);
+
+				SetValue(VALUE_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
+			}
 		}
 
-		public SaveableValueSection GetValue(string key)
+		public SaveableValueSection GetValueSection(string key)
 		{
 			SaveableValueSection readValue;
 			if(_keyToNormalValue.TryGetValue(key, out readValue))
 			{
 				return readValue;
 			}
-
 			return default;
 		}
 
 		public void RemoveValue(string key)
 		{
 			_keyToNormalValue.Remove(key);
+
+			if (_keysToKeep.Contains(key))
+			{
+				_keysToKeep.Remove(key);
+			}
+
+			SetValue(VALUE_KEYS_TO_KEEP_KEY, SaveableArray.From(_keysToKeep.ToArray()));
 		}
 
 		public void RelocateValue(string currentKey, string newKey)
@@ -217,7 +243,7 @@ namespace RDP.SaveLoadSystem
 			SaveableValueSection value;
 			if(_keyToNormalValue.TryGetValue(currentKey, out value))
 			{
-				_keyToNormalValue.Remove(currentKey);
+				RemoveValue(currentKey);
 				SetValue(newKey, value.GetValue());
 			}
 		}

@@ -27,6 +27,7 @@ namespace RDP.SaveLoadSystem.Internal
 		private static void Init()
 		{
 			StorageInspectorEditor window = GetWindow<StorageInspectorEditor>();
+			window.titleContent = new GUIContent("Storage Inspector");
 			window.Show();
 		}
 
@@ -216,7 +217,7 @@ namespace RDP.SaveLoadSystem.Internal
 								StorageKey = valKeys[i],
 							};
 						}
-						ValKeys[i] = new ValKeyItem(valueEntry, storageDictionaryEditor.GetValue(valKeys[i]));
+						ValKeys[i] = new ValKeyItem(valueEntry, storageDictionaryEditor.GetValueSection(valKeys[i]));
 					}
 
 					string[] refKeys = storageDictionaryEditor.GetRefStorageKeys();
@@ -367,7 +368,7 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 				else
 				{
-					return _keyEntry.IsOfExpectedType(_editableRefValue.ReferenceType) ? string.Empty : string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, _keyEntry.ExpectedType.Name, _editableRefValue.ReferenceType.Name);
+					return _keyEntry.IsOfExpectedType(_editableRefValue.ReferenceType) ? string.Empty : string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, _keyEntry.GetExpectedType().Name, _editableRefValue.ReferenceType.Name);
 				}
 			}
 
@@ -398,8 +399,17 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 			}
 
+			public bool IsArray
+			{
+				get
+				{
+					return _arrayValue.HasValue;
+				}
+			}
+
 			private SaveableValueSection _valueSection;
 			private SaveableDict? _dictValue = null;
+			private SaveableArray? _arrayValue = null;
 			private StorageKeyEntry _keyEntry;
 
 			public ValItem(StorageKeyEntry keyEntry, SaveableValueSection valueSection) : base(keyEntry.StorageKey)
@@ -409,6 +419,10 @@ namespace RDP.SaveLoadSystem.Internal
 				if(_valueSection.GetSafeValueType() == typeof(SaveableDict))
 				{
 					_dictValue = (SaveableDict)_valueSection.GetValue();
+				}
+				else if(_valueSection.GetSafeValueType() == typeof(SaveableArray))
+				{
+					_arrayValue = (SaveableArray)_valueSection.GetValue();
 				}
 			}
 
@@ -430,6 +444,16 @@ namespace RDP.SaveLoadSystem.Internal
 						GUILayout.BeginVertical(GUI.skin.box);
 						DrawTypeItemLabel(string.Concat("Key: ", item.KeySection.ValueString), GetTypeString(item.KeySection.GetSafeValueType(), item.KeySection.ValueType), infoKey, keyState);
 						DrawTypeItemLabel(string.Concat("Value: ", item.ValueSection.ValueString), GetTypeString(item.ValueSection.GetSafeValueType(), item.ValueSection.ValueType), infoValue, valueState);
+						GUILayout.EndVertical();
+					}
+				}
+				else if(GetArrayState(out State arrayState, out string arrayInfo))
+				{
+					for(int i = 0; i < _arrayValue.Value.Items.Length; i++)
+					{
+						SaveableValueSection entry = _arrayValue.Value.Items[i];
+						GUILayout.BeginVertical(GUI.skin.box);
+						DrawTypeItemLabel(string.Concat(i, ": ", entry.ValueString), GetTypeString(entry.GetSafeValueType(), entry.ValueType), arrayInfo, arrayState);
 						GUILayout.EndVertical();
 					}
 				}
@@ -456,7 +480,7 @@ namespace RDP.SaveLoadSystem.Internal
 					return;
 				}
 
-				if (_valueSection.GetSafeValueType() == null || _keyEntry.ExpectedType == null)
+				if (_valueSection.GetSafeValueType() == null || _keyEntry.GetExpectedType() == null)
 				{
 					state = State.Error;
 					info = state == State.Normal ? string.Empty : TYPE_NOT_FOUND_INFO_MESSAGE;
@@ -470,8 +494,48 @@ namespace RDP.SaveLoadSystem.Internal
 					return;
 				}
 
+				if(GetArrayState(out State arrayState, out string arrayInfo))
+				{
+					state = arrayState;
+					info = arrayInfo;
+					return;
+				}
+
 				state = _keyEntry.IsOfExpectedType(_valueSection.GetSafeValueType()) ? State.Normal : State.Error;
-				info = state == State.Normal ? string.Empty : string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, _keyEntry.ExpectedType.Name, _valueSection.GetSafeValueType().Name);
+				info = state == State.Normal ? string.Empty : string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, _keyEntry.GetExpectedType().Name, _valueSection.GetSafeValueType().Name);
+			}
+
+			private bool GetArrayState(out State arrayState, out string info)
+			{
+				info = string.Empty;
+				arrayState = State.Normal;
+
+				if(IsArray)
+				{
+					if (_arrayValue.Value.Items.Length > 0)
+					{
+						if (_keyEntry.TryGetExpectedArrayType(out Type expectedArrayType))
+						{
+							SaveableValueSection item = _arrayValue.Value.Items[0];
+							arrayState = item.GetSafeValueType() != null && expectedArrayType.IsAssignableFrom(item.GetSafeValueType()) ? State.Normal : State.Error;
+
+							if (arrayState == State.Error)
+							{
+								if (item.GetSafeValueType() == null)
+								{
+									info = TYPE_NOT_FOUND_INFO_MESSAGE;
+								}
+								else
+								{
+									info = string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, expectedArrayType.Name, item.GetSafeValueType().Name);
+								}
+							}
+						}
+					}
+					return true;
+				}
+
+				return false;
 			}
 
 			private bool GetDictState(out State keyState, out string infoKey, out State valueState, out string infoValue)
@@ -483,12 +547,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 				if (IsDict)
 				{
-					if (_dictValue.Value.Items.Length == 0)
-					{
-						keyState = State.Normal;
-						valueState = State.Normal;
-					}
-					else
+					if (_dictValue.Value.Items.Length > 0)
 					{
 						if (_keyEntry.TryGetExpectedDictTypes(out Type expectedKeyType, out Type expectedValueType))
 						{
