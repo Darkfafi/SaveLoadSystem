@@ -6,13 +6,17 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
+using static RDP.SaveLoadSystem.Internal.StorageKeySearcher;
 
 namespace RDP.SaveLoadSystem.Internal
 {
 	public class StorageInspectorEditor : EditorWindow
 	{
+		private const string TYPE_NOT_FOUND_INFO_MESSAGE = "Type not found in project";
+		private const string EXPECTED_TYPE_INFO_MESSAGE_F = "Expected type {0} but found type {1}";
+
 		private Storage _currentlyViewingStorage = null;
-		private List<StoringUIItem> _capsuleUIItems = new List<StoringUIItem>();
+		private List<CapsuleItem> _capsuleUIItems = new List<CapsuleItem>();
 
 		private List<IStorageCapsule> _iStorageCapsuleInstances = new List<IStorageCapsule>();
 		private List<string> _capsuleIDs = new List<string>();
@@ -42,12 +46,12 @@ namespace RDP.SaveLoadSystem.Internal
 			EditorGUILayout.LabelField("Encoding Type:");
 			_encodingTypeInputValue = (Storage.EncodingType)EditorGUILayout.EnumPopup(_encodingTypeInputValue);
 
-			if(GUILayout.Button("Load Storage"))
+			if (GUILayout.Button("Load Storage"))
 			{
 				LoadStorage(_pathInputValue, _encodingTypeInputValue);
 			}
 
-			if(_currentlyViewingStorage != null)
+			if (_currentlyViewingStorage != null)
 			{
 				if (GUILayout.Button("Refresh"))
 				{
@@ -58,7 +62,7 @@ namespace RDP.SaveLoadSystem.Internal
 			if (_capsuleUIItems != null)
 			{
 				_scroll = EditorGUILayout.BeginScrollView(_scroll);
-				for(int i = 0; i < _capsuleUIItems.Count; i++)
+				for (int i = 0; i < _capsuleUIItems.Count; i++)
 				{
 					_capsuleUIItems[i].RenderGUI(0);
 				}
@@ -78,22 +82,22 @@ namespace RDP.SaveLoadSystem.Internal
 		{
 			RefreshStorageCapsuleInstances();
 			_currentlyViewingStorage = new Storage(path, encodingType, _iStorageCapsuleInstances.ToArray());
-			ReadStorageResult[]  results = _currentlyViewingStorage.Read(_capsuleIDs.ToArray()).ToArray();
+			ReadStorageResult[] results = _currentlyViewingStorage.Read(_capsuleIDs.ToArray()).ToArray();
 
 			for (int i = 0; i < results.Length; i++)
 			{
 				ReadStorageResult result = results[i];
 
 				IStorageCapsule storageCapsuleInstance = _iStorageCapsuleInstances.Find(x => x.ID == result.CapsuleID);
-				StorageKeySearcher.StorageKeyEntry[] keyEntries = new StorageKeySearcher.StorageKeyEntry[] { };
+				Dictionary<string, StorageKeyEntry> keyEntries = new Dictionary<string, StorageKeyEntry>();
 
 
 				if (storageCapsuleInstance != null)
 				{
-					keyEntries = StorageKeySearcher.GetKeyEntries(storageCapsuleInstance.GetType());
+					keyEntries = GetKeyEntries(storageCapsuleInstance.GetType());
 				}
 
-				_capsuleUIItems.Add(new StoringUIItem(result.CapsuleID, result.CapsuleStorage, keyEntries));
+				_capsuleUIItems.Add(new CapsuleItem(result.CapsuleID, result.CapsuleStorage, keyEntries));
 			}
 		}
 
@@ -103,10 +107,10 @@ namespace RDP.SaveLoadSystem.Internal
 			_capsuleIDs.Clear();
 			_capsuleUIItems.Clear();
 			Type[] storageCapsuleTypes = Assembly.GetAssembly(typeof(IStorageCapsule)).GetTypes().Where(x => x.GetInterfaces().Contains(typeof(IStorageCapsule))).ToArray();
-			for(int i = 0; i < storageCapsuleTypes.Length; i++)
+			for (int i = 0; i < storageCapsuleTypes.Length; i++)
 			{
 				IStorageCapsule instance = Activator.CreateInstance(storageCapsuleTypes[i]) as IStorageCapsule;
-				if(instance != null)
+				if (instance != null)
 				{
 					_iStorageCapsuleInstances.Add(instance);
 					_capsuleIDs.Add(instance.ID);
@@ -114,399 +118,413 @@ namespace RDP.SaveLoadSystem.Internal
 			}
 		}
 
-		#region UI Elements
+		#region UI New
 
-		private class RefUIItem : StoringUIItem
+		// Capsule == ID & Storage
+		// Ref == ID, Type & Storage
+		// Value == Type and Value String
+		// Storage == Keys > Values & Keys > Refs
+		// A Key can hold 1 or more Refs or Values
+
+		#region Items
+
+		private class StorageItem : BaseItem
 		{
-			public EditableRefValue Reference
+			public ValKeyItem[] ValKeys
 			{
 				get; private set;
 			}
 
-			public StorageKeySearcher.StorageKeyEntry OwnKeyEntry
+			public RefsKeyItem[] RefsKeys
 			{
 				get; private set;
 			}
 
-			public override bool IsExpectedTypeMatch()
+			public Dictionary<string, StorageKeyEntry> KeyEntries
 			{
-				if(Reference.ReferenceType == null)
-				{
-					return base.IsExpectedTypeMatch();
-				}
-
-				return OwnKeyEntry.ExpectedType != null && OwnKeyEntry.ExpectedType.IsAssignableFrom(Reference.ReferenceType);
+				get; private set;
 			}
 
 			public override State CorruptionState
 			{
 				get
 				{
-					if(base.CorruptionState == State.Error || Reference.ReferenceType == null)
-					{
-						return State.Error;
-					}
-
-					if(!IsExpectedTypeMatch())
-					{
-						return State.Warning;
-					}
-
-					return base.CorruptionState;
+					List<BaseKeyItem> keys = new List<BaseKeyItem>(ValKeys);
+					keys.AddRange(RefsKeys);
+					State worstKeysState = GetWorstState(keys.ToArray());
+					return GetWorstState(worstKeysState);
 				}
 			}
 
-			public RefUIItem(string refKey, EditableRefValue refValue, StorageKeySearcher.StorageKeyEntry ownKey, StorageKeySearcher.StorageKeyEntry[] keyEntries) : base(refKey, refValue.Storage, keyEntries)
+			public StorageItem(string parentKey, IStorageDictionaryEditor storageDictionaryEditor, Dictionary<string, StorageKeyEntry> keyEntries) : base(parentKey)
 			{
-				OwnKeyEntry = ownKey;
-				Reference = refValue;
-			}
-
-			protected override void OnRenderGUI(int layer)
-			{
-				GUIStyle typeStyle = new GUIStyle(GUI.skin.label);
-				string typeDisplay = string.Empty;
-				string infoText = string.Empty;
-				State typeCorruptionState = State.Normal;
-
-				if (Reference.ReferenceType == null)
+				KeyEntries = keyEntries;
+				if (storageDictionaryEditor != null)
 				{
-					typeCorruptionState = State.Error;
-					typeDisplay = Reference.ReferenceTypeString;
-					infoText = $"Reference type not found in project!";
+					string[] valKeys = storageDictionaryEditor.GetValueStorageKeys();
+					ValKeys = new ValKeyItem[valKeys.Length];
+					for (int i = 0; i < valKeys.Length; i++)
+					{
+						if(!keyEntries.TryGetValue(valKeys[i], out StorageKeyEntry valueEntry))
+						{
+							valueEntry = new StorageKeyEntry(valKeys[i], null, false);
+						}
+						ValKeys[i] = new ValKeyItem(valueEntry, storageDictionaryEditor.GetValue(valKeys[i]));
+					}
+
+					string[] refKeys = storageDictionaryEditor.GetRefStorageKeys();
+					RefsKeys = new RefsKeyItem[refKeys.Length];
+					for (int i = 0; i < refKeys.Length; i++)
+					{
+						if (!keyEntries.TryGetValue(refKeys[i], out StorageKeyEntry refEntry))
+						{
+							refEntry = new StorageKeyEntry(refKeys[i], null, false);
+						}
+						RefsKeys[i] = new RefsKeyItem(refEntry, storageDictionaryEditor.GetValueRefs(refKeys[i]));
+					}
 				}
 				else
 				{
-					if(!IsExpectedTypeMatch())
-					{
-						typeCorruptionState = State.Warning;
-						infoText = $"Expected type {OwnKeyEntry.ExpectedType.Name} but found value of type {Reference.ReferenceType.Name}";
-					}
-
-					typeDisplay = Reference.ReferenceType.ToString();
+					ValKeys = new ValKeyItem[] { };
+					RefsKeys = new RefsKeyItem[] { };
 				}
+			}
 
-				Color? typeColor = GetCorruptionStateColor(typeCorruptionState);
-
-				if(typeColor.HasValue)
+			protected override void OnRenderGUI(int layer)
+			{
+				for(int i = 0; i < ValKeys.Length; i++)
 				{
-					typeStyle.normal.textColor = typeColor.Value;
+					ValKeys[i].RenderGUI(layer + 1);
 				}
 
-				EditorGUILayout.LabelField(string.Concat("- ID: ", Reference.ReferenceID));
-				EditorGUILayout.LabelField(new GUIContent(string.Concat("- Type: ", typeDisplay), infoText), typeStyle);
-				EditorGUILayout.LabelField(string.Concat("- Storage: ", Reference.Storage == null ? "Empty" : ""));
-				base.OnRenderGUI(layer);
+				for (int i = 0; i < RefsKeys.Length; i++)
+				{
+					RefsKeys[i].RenderGUI(layer + 1);
+				}
 			}
 		}
 
-		private class StoringUIItem : UIItem
+		private class CapsuleItem : BaseFoldoutItem
 		{
-			private List<RefUIItem> _nestedRefs = new List<RefUIItem>();
-			private List<UIItem> _nestedValues = new List<UIItem>();
-
-			private IStorageDictionaryEditor _storage;
-
-			public override bool IsExpectedTypeMatch()
-			{
-				return true;
-			}
-
-			public override State CorruptionState
-			{
-				get
-				{
-					if(_nestedValues.Any(x => x.CorruptionState == State.Error) || _nestedRefs.Any(x => x.CorruptionState == State.Error))
-					{
-						return State.Error;
-					}
-
-					if (_nestedValues.Any(x => x.CorruptionState == State.Warning) || _nestedRefs.Any(x => x.CorruptionState == State.Warning))
-					{
-						return State.Warning;
-					}
-
-					return State.Normal;
-				}
-			}
-
-			public StorageKeySearcher.StorageKeyEntry[] KeyEntries
+			public string ID
 			{
 				get; private set;
 			}
 
-			public StoringUIItem(string id, IStorageDictionaryEditor storage, StorageKeySearcher.StorageKeyEntry[] keyEntries) : base(id, false)
-			{
-				_storage = storage;
-				KeyEntries = keyEntries;
-				if (_storage != null)
-				{
-					string[] valKeys = _storage.GetValueStorageKeys();
-					for (int i = 0; i < valKeys.Length; i++)
-					{
-						string valKey = valKeys[i];
-						object val = _storage.GetValue(valKey);
-						StorageKeySearcher.StorageKeyEntry entry = KeyEntries.FirstOrDefault(x => x.StorageKey == valKey);
-						if (val.GetType() == typeof(SaveableDict))
-						{
-							_nestedValues.Add(new DictElementItem(valKey, (SaveableDict)val, entry));
-						}
-						else
-						{
-							_nestedValues.Add(new ElementItem(valKey, val, entry));
-						}
-					}
-
-					string[] refKeys = _storage.GetRefStorageKeys();
-					for (int i = 0; i < refKeys.Length; i++)
-					{
-						string tRefKey = refKeys[i];
-						EditableRefValue[] refsVals = _storage.GetValueRefs(tRefKey);
-						for (int j = 0; j < refsVals.Length; j++)
-						{
-							EditableRefValue refVal = refsVals[j];
-							StorageKeySearcher.StorageKeyEntry entry = KeyEntries.FirstOrDefault(x => x.StorageKey == tRefKey);
-							_nestedRefs.Add(new RefUIItem(tRefKey, refVal, entry, StorageKeySearcher.GetKeyEntries(refVal.ReferenceType)));
-						}
-					}
-				}
-			}
-
-			protected override void OnRenderGUI(int layer)
-			{
-				for (int i = 0; i < _nestedValues.Count; i++)
-				{
-					_nestedValues[i].RenderGUI(layer + 1);
-				}
-
-				for (int i = 0; i < _nestedRefs.Count; i++)
-				{
-					_nestedRefs[i].RenderGUI(layer + 1);
-				}
-			}
-		}
-
-		private class ElementItem : UIItem
-		{
-			private object _value;
-
-			public override State CorruptionState
-			{
-				get
-				{
-					if (!IsExpectedTypeMatch())
-						return State.Warning;
-
-					return State.Normal;
-				}
-			}
-
-			public StorageKeySearcher.StorageKeyEntry KeyEntry
+			public StorageItem StorageItem
 			{
 				get; private set;
 			}
 
-			public ElementItem(string key, object value, StorageKeySearcher.StorageKeyEntry keyEntry) : base(key, true)
+			public override State CorruptionState
 			{
-				KeyEntry = keyEntry;
-				_value = value;
+				get
+				{
+					return StorageItem.CorruptionState;
+				}
+			}
+
+			public CapsuleItem(string id, IStorageDictionaryEditor storage, Dictionary<string, StorageKeyEntry> keyEntries) : base(id, false)
+			{
+				ID = id;
+				StorageItem = new StorageItem(id, storage, keyEntries);
 			}
 
 			protected override void OnRenderGUI(int layer)
 			{
-				GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
-				State labelState = State.Normal;
-				string infoText = string.Empty;
-
-				if(!IsExpectedTypeMatch())
-				{
-					labelState = State.Warning;
-					infoText = $"Expected type {KeyEntry.ExpectedType.Name} but found value of type {_value.GetType().Name}";
-				}
-
-				Color? labelColor = GetCorruptionStateColor(labelState);
-
-				if (labelColor.HasValue)
-				{
-					labelStyle.normal.textColor = labelColor.Value;
-				}
-
-				EditorGUILayout.LabelField(new GUIContent(string.Concat(_value.ToString()), infoText), labelStyle);
-			}
-
-			public override bool IsExpectedTypeMatch()
-			{
-				if(_value == null || KeyEntry.ExpectedType == null)
-				{
-					return true;
-				}
-
-				return KeyEntry.ExpectedType.IsAssignableFrom(_value.GetType());
+				StorageItem.RenderGUI(layer + 1);
 			}
 		}
 
-		private class DictElementItem : ElementItem
+		private class RefItem : BaseItem
 		{
-			private SaveableDict _dict;
-
-			public DictElementItem(string key, SaveableDict dict, StorageKeySearcher.StorageKeyEntry keyEntry) : base(key, dict, keyEntry)
+			public string ID
 			{
-				_dict = dict;
+				get
+				{
+					return _editableRefValue.ReferenceID;
+				}
+			}
+
+			public StorageItem StorageItem
+			{
+				get; private set;
 			}
 
 			public override State CorruptionState
 			{
 				get
 				{
-					if(_dict.Items.Any(x => !IsTypeValid(x.KeySection.ValueType) || !IsTypeValid(x.ValueSection.ValueType)))
-					{
-						return State.Error;
-					}
-
-					if(!IsExpectedTypeMatch())
-					{
-						return State.Warning;
-					}
-
-					return State.Normal;
+					return GetWorstState(GetTypeCurruptionState(), StorageItem.CorruptionState);
 				}
 			}
 
-			public override bool IsExpectedTypeMatch()
+			private EditableRefValue _editableRefValue;
+			private StorageKeyEntry _keyEntry;
+
+			public RefItem(StorageKeyEntry keyEntry, EditableRefValue editableRefValue) : base(keyEntry.StorageKey)
 			{
-				if(KeyEntry.ExpectedType == null)
-					return false;
-
-				GetKeyValueTypesValid(out bool keyTypeValid, out bool valueTypeValid);
-
-				return keyTypeValid && valueTypeValid;
+				_keyEntry = keyEntry;
+				_editableRefValue = editableRefValue;
+				StorageItem = new StorageItem(keyEntry.StorageKey, _editableRefValue.Storage, GetKeyEntries(_editableRefValue.ReferenceType));
 			}
 
 			protected override void OnRenderGUI(int layer)
 			{
-				for (int j = 0; j < _dict.Items.Length; j++)
+				DrawNormalItemLabel(string.Concat("- ID: ", ID));
+				DrawItemLabel(string.Concat("- Type: ", GetTypeString(_editableRefValue.ReferenceType, _editableRefValue.ReferenceTypeString)), GetTypeInfoText(), GetTypeCurruptionState());
+				DrawItemLabel("- Storage: ", string.Empty, StorageItem.CorruptionState);
+				StorageItem.RenderGUI(layer + 1);
+			}
+
+			private string GetTypeInfoText()
+			{
+				if (_editableRefValue.ReferenceType == null)
 				{
-					DictItem item = _dict.Items[j];
-
-					GUIStyle keyLabelStyle = new GUIStyle(GUI.skin.label);
-					GUIStyle valueLabelStyle = new GUIStyle(GUI.skin.label);
-
-					State keyState = State.Normal;
-					State valueState = State.Normal;
-
-					string keyType = item.KeySection.ValueType;
-					string valueType = item.ValueSection.ValueType;
-
-					string keyInfoText = string.Empty;
-					string valueInfoText = string.Empty;
-
-					GetKeyValueTypesValid(out bool keyTypeValid, out bool valueTypeValid);
-					TryGetExpectedTypes(out Type expectedKeyType, out Type expectedValueType);
-
-					if (IsTypeValid(item.KeySection.ValueType))
-					{
-						keyType = item.KeySection.GetValueType().Name;
-
-						if (!keyTypeValid)
-						{
-							keyState = State.Warning;
-							keyInfoText = $"Expected type {expectedKeyType.Name} but found value of type {keyType}";
-						}
-					}
-					else
-					{
-						keyState = State.Error;
-					}
-
-					if(IsTypeValid(item.ValueSection.ValueType))
-					{
-						valueType = item.ValueSection.GetValueType().Name;
-
-						if(!valueTypeValid)
-						{
-							valueState = State.Warning;
-							valueInfoText = $"Expected type {expectedValueType.Name} but found value of type {valueType}";
-						}
-					}
-					else
-					{
-						valueState = State.Error;
-					}
-
-					Color? keyColor = GetCorruptionStateColor(keyState);
-					Color? valueColor = GetCorruptionStateColor(valueState);
-
-					if(keyColor.HasValue)
-					{
-						keyLabelStyle.normal.textColor = keyColor.Value;
-					}
-
-					if(valueColor.HasValue)
-					{
-						valueLabelStyle.normal.textColor = valueColor.Value;
-					}
-
-					GUILayout.BeginVertical(GUI.skin.box);
-
-					EditorGUILayout.LabelField(new GUIContent(string.Concat("Key: ", item.KeySection.ValueString, " << ", keyType), keyInfoText), keyLabelStyle);
-					EditorGUILayout.LabelField(new GUIContent(string.Concat("Value: ", item.ValueSection.ValueString, " << ", valueType), valueInfoText), valueLabelStyle);
-					GUILayout.EndVertical();
+					return TYPE_NOT_FOUND_INFO_MESSAGE;
+				}
+				else
+				{
+					return _keyEntry.IsOfExpectedType(_editableRefValue.ReferenceType) ? string.Empty : string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, _keyEntry.ExpectedType.Name, _editableRefValue.ReferenceType.Name);
 				}
 			}
 
-			private void GetKeyValueTypesValid(out bool keyTypeValid, out bool valueTypeValid)
+			private State GetTypeCurruptionState()
 			{
-				keyTypeValid = false;
-				valueTypeValid = false;
-
-				if (KeyEntry.ExpectedType == null)
+				if (_editableRefValue.ReferenceType == null)
 				{
+					return State.Error;
+				}
+				else
+				{
+					return _keyEntry.IsOfExpectedType(_editableRefValue.ReferenceType) ? State.Normal : State.Error;
+				}
+			}
+		}
+
+		private class ValItem : BaseItem
+		{
+			public bool IsDict
+			{
+				get
+				{
+					return _dictValue.HasValue;
+				}
+			}
+
+			private SaveableValueSection _valueSection;
+			private SaveableDict? _dictValue = null;
+			private StorageKeyEntry _keyEntry;
+
+			public ValItem(StorageKeyEntry keyEntry, SaveableValueSection valueSection) : base(keyEntry.StorageKey)
+			{
+				_keyEntry = keyEntry;
+				_valueSection = valueSection;
+				if(_valueSection.GetSafeValueType() == typeof(SaveableDict))
+				{
+					_dictValue = (SaveableDict)_valueSection.GetValue();
+				}
+			}
+
+			public override State CorruptionState
+			{
+				get
+				{
+					GetCorruptStateWithInfo(out State state, out _);
+					return state;
+				}
+			}
+
+			protected override void OnRenderGUI(int layer)
+			{
+				if (GetDictState(out State keyState, out string infoKey, out State valueState, out string infoValue))
+				{
+					foreach (DictItem item in _dictValue.Value.Items)
+					{
+						GUILayout.BeginVertical(GUI.skin.box);
+						DrawTypeItemLabel(string.Concat("Key: ", item.KeySection.ValueString), GetTypeString(item.KeySection.GetSafeValueType(), item.KeySection.ValueType), infoKey, keyState);
+						DrawTypeItemLabel(string.Concat("Value: ", item.ValueSection.ValueString), GetTypeString(item.ValueSection.GetSafeValueType(), item.ValueSection.ValueType), infoValue, valueState);
+						GUILayout.EndVertical();
+					}
+				}
+				else
+				{
+					GetCorruptStateWithInfo(out State state, out string info);
+					DrawTypeItemLabel(_valueSection.ValueString, GetTypeString(_valueSection.GetSafeValueType(), _valueSection.ValueType), info, state);
+				}
+			}
+
+			private void GetCorruptStateWithInfo(out State state, out string info)
+			{
+				if (Storage.STORAGE_REFERENCE_TYPE_STRING_KEY == _keyEntry.StorageKey)
+				{
+					state = _keyEntry.IsOfExpectedType(_valueSection.ValueString) ? State.Normal : State.Error;
+					info = state == State.Normal ? string.Empty : $"Type is not of interface `{nameof(ISaveable)}`";
 					return;
 				}
 
-				if (TryGetExpectedTypes(out Type keyType, out Type valueType))
+				if (_valueSection.GetSafeValueType() == null || _keyEntry.ExpectedType == null)
 				{
-					if (_dict.Items.Length == 0)
-					{
-						keyTypeValid = true;
-						valueTypeValid = true;
-						return;
-					}
-
-					DictItem item = _dict.Items[0];
-					Type tKey = GetTypeSafe(item.KeySection.ValueType);
-					Type tValue = GetTypeSafe(item.ValueSection.ValueType);
-
-					keyTypeValid = tKey != null && keyType.IsAssignableFrom(tKey);
-					valueTypeValid = tValue != null && valueType.IsAssignableFrom(tValue);
+					state = State.Error;
+					info = state == State.Normal ? string.Empty : TYPE_NOT_FOUND_INFO_MESSAGE;
+					return;
 				}
+
+				if (GetDictState(out State keyState, out string a, out State valueState, out string b))
+				{
+					state = GetWorstState(keyState, valueState);
+					info = state == State.Normal ? string.Empty : (a.Length > b.Length ? a : b);
+					return;
+				}
+
+				state = _keyEntry.IsOfExpectedType(_valueSection.GetSafeValueType()) ? State.Normal : State.Error;
+				info = state == State.Normal ? string.Empty : string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, _keyEntry.ExpectedType.Name, _valueSection.GetSafeValueType().Name);
 			}
 
-			private bool TryGetExpectedTypes(out Type keyType, out Type valueType)
+			private bool GetDictState(out State keyState, out string infoKey, out State valueState, out string infoValue)
 			{
-				if (KeyEntry.ExpectedType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+				infoKey = string.Empty;
+				infoValue = string.Empty;
+				keyState = State.Normal;
+				valueState = State.Normal;
+
+				if (IsDict)
 				{
-					Type[] arguments = KeyEntry.ExpectedType.GetGenericArguments();
-					keyType = arguments[0];
-					valueType = arguments[1];
+					if (_dictValue.Value.Items.Length == 0)
+					{
+						keyState = State.Normal;
+						valueState = State.Normal;
+					}
+					else
+					{
+						if (_keyEntry.TryGetExpectedDictTypes(out Type expectedKeyType, out Type expectedValueType))
+						{
+							DictItem item = _dictValue.Value.Items[0];
+							Type tKey = item.KeySection.GetSafeValueType();
+							Type tValue = item.ValueSection.GetSafeValueType();
+
+							keyState = tKey != null && expectedKeyType.IsAssignableFrom(tKey) ? State.Normal : State.Error;
+							valueState = tValue != null && expectedValueType.IsAssignableFrom(tValue) ? State.Normal : State.Error;
+
+							if(keyState == State.Error)
+							{
+								if(tKey == null)
+								{
+									infoKey = TYPE_NOT_FOUND_INFO_MESSAGE;
+								}
+								else
+								{
+									infoKey = string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, expectedKeyType.Name, tKey.Name);
+								}
+							}
+
+							if (valueState == State.Error)
+							{
+								if (tValue == null)
+								{
+									infoValue = TYPE_NOT_FOUND_INFO_MESSAGE;
+								}
+								else
+								{
+									infoValue = string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, expectedValueType.Name, tValue.Name);
+								}
+							}
+						}
+					}
+
 					return true;
 				}
 
-				keyType = null;
-				valueType = null;
 				return false;
 			}
 		}
 
-		private abstract class UIItem
+		#endregion
+
+		#region Key Items
+
+		private class RefsKeyItem : BaseKeyItem
 		{
-			public enum State
+			public RefItem[] RefItems
 			{
-				Normal,
-				Warning,
-				Error
+				get; private set;
 			}
 
+			public override State CorruptionState
+			{
+				get
+				{
+					return GetWorstState(RefItems);
+				}
+			}
+
+			public RefsKeyItem(StorageKeyEntry keyEntry, EditableRefValue[] refs) : base(keyEntry.StorageKey)
+			{
+				RefItems = new RefItem[refs.Length];
+				for (int i = 0; i < refs.Length; i++)
+				{
+					RefItems[i] = new RefItem(keyEntry, refs[i]);
+				}
+			}
+
+			protected override void OnRenderGUI(int layer)
+			{
+				if (RefItems.Length != 1)
+				{
+					for (int i = 0; i < RefItems.Length; i++)
+					{
+						EditorGUILayout.BeginVertical(GUI.skin.box);
+						RefItems[i].RenderGUI(layer);
+						EditorGUILayout.EndVertical();
+					}
+				}
+				else
+				{
+					RefItems[0].RenderGUI(layer);
+				}
+			}
+		}
+
+		private class ValKeyItem : BaseKeyItem
+		{
+			public ValItem ValItem
+			{
+				get; private set;
+			}
+
+			public override State CorruptionState
+			{
+				get
+				{
+					return ValItem.CorruptionState;
+				}
+			}
+
+			public ValKeyItem(StorageKeyEntry keyEntry, SaveableValueSection value) : base(keyEntry.StorageKey)
+			{
+				ValItem = new ValItem(keyEntry, value);
+			}
+
+			protected override void OnRenderGUI(int layer)
+			{
+				ValItem.RenderGUI(layer + 1);
+			}
+		}
+
+		private abstract class BaseKeyItem : BaseFoldoutItem
+		{
+			public BaseKeyItem(string key) : base(key, false)
+			{
+
+			}
+		}
+
+		#endregion
+
+		#endregion
+
+		private abstract class BaseFoldoutItem : BaseItem
+		{
 			public bool IsOpen
 			{
 				get; private set;
@@ -517,33 +535,22 @@ namespace RDP.SaveLoadSystem.Internal
 				get; private set;
 			}
 
-			public string Key
+			public BaseFoldoutItem(string key, bool defaultIsOpenValue) : base(key)
 			{
-				get; private set;
-			}
-
-			public abstract State CorruptionState
-			{
-				get;
-			}
-
-			public UIItem(string key, bool defaultIsOpenValue)
-			{
-				Key = key;
-				Title = Key;
+				Title = key;
 				IsOpen = defaultIsOpenValue;
 			}
 
-			public void RenderGUI(int layer)
+			public override void RenderGUI(int layer)
 			{
 				GUILayout.BeginHorizontal();
-				GUILayout.Space(layer * 10);
+				GUILayout.Space(layer * 5);
 
 				GUIStyle foldoutStyle = new GUIStyle(EditorStyles.foldout);
 
 				Color? color = GetCorruptionStateColor(CorruptionState);
 
-				if(color.HasValue)
+				if (color.HasValue)
 				{
 					foldoutStyle.normal.textColor = color.Value;
 				}
@@ -554,21 +561,49 @@ namespace RDP.SaveLoadSystem.Internal
 				if (IsOpen)
 				{
 					GUILayout.BeginHorizontal();
-					GUILayout.Space(layer * 20);
+					GUILayout.Space(layer * 10);
 					GUILayout.BeginVertical(GUI.skin.box);
-					OnRenderGUI(layer);
+					base.RenderGUI(layer);
 					GUILayout.EndVertical();
 					GUILayout.EndHorizontal();
 				}
 			}
+		}
 
-			public abstract bool IsExpectedTypeMatch();
+		private abstract class BaseItem
+		{
+			public enum State
+			{
+				Normal = 0,
+				Warning = 1,
+				Error = 2
+			}
+
+			public abstract State CorruptionState
+			{
+				get;
+			}
+
+			public string Key
+			{
+				get; private set;
+			}
+
+			public BaseItem(string key)
+			{
+				Key = key;
+			}
+
+			public virtual void RenderGUI(int layer)
+			{
+				OnRenderGUI(layer);
+			}
 
 			protected abstract void OnRenderGUI(int layer);
 
 			protected string GetCorruptionStateIcon(State state)
 			{
-				switch(state)
+				switch (state)
 				{
 					case State.Error:
 						return "[!]";
@@ -592,27 +627,79 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 			}
 
-			protected bool IsTypeValid(string typeString)
+			protected void DrawNormalItemLabel(string labelValue, string infoText = "")
 			{
-				return GetTypeSafe(typeString) != null;
+				DrawItemLabel(labelValue, infoText, State.Normal);
 			}
 
-			protected Type GetTypeSafe(string typeString)
+			protected void DrawItemLabel(string labelValue, string infoText = "")
 			{
-				if (string.IsNullOrEmpty(typeString))
-					return null;
+				DrawItemLabel(labelValue, infoText, CorruptionState);
+			}
 
-				try
+			protected void DrawItemLabel(string labelValue, string infoText, State curruptionState)
+			{
+				GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
+
+				string icon = GetCorruptionStateIcon(curruptionState);
+				Color? color = GetCorruptionStateColor(curruptionState);
+
+				if(color.HasValue)
 				{
-					return Type.GetType(typeString);
+					labelStyle.normal.textColor = color.Value;
 				}
-				catch
+
+				GUIContent labelContent;
+
+				if(string.IsNullOrEmpty(infoText))
 				{
-					return null;
+					labelContent = new GUIContent(string.Concat(labelValue, " ", icon));
 				}
+				else
+				{
+					labelContent = new GUIContent(string.Concat(labelValue, " ", icon), string.Concat(infoText, " ", icon));
+				}
+
+				EditorGUILayout.LabelField(labelContent, labelStyle);
+			}
+
+			protected void DrawTypeItemLabel(string labelValue, string typeValue, string infoText = "")
+			{
+				DrawTypeItemLabel(labelValue, typeValue, infoText, CorruptionState);
+			}
+
+			protected void DrawTypeItemLabel(string labelValue, string typeValue, string infoText, State curruptionState)
+			{
+				DrawItemLabel(string.Concat(labelValue, " << ", typeValue), infoText, curruptionState);
+			}
+
+			protected string GetTypeString(Type type, string typeString)
+			{
+				return type == null ? typeString : type.Name;
+			}
+
+			protected State GetWorstState(params BaseItem[] items)
+			{
+				return GetWorstState(items.Select(x => x.CorruptionState).ToArray());
+			}
+
+			protected State GetWorstState(params State[] states)
+			{
+				State state = State.Normal;
+
+				if (states == null || states.Length == 0)
+					return state;
+
+				for (int i = 0; i < states.Length; i++)
+				{
+					if (states[i] > state)
+					{
+						state = states[i];
+					}
+				}
+
+				return state;
 			}
 		}
-
-		#endregion
 	}
 }

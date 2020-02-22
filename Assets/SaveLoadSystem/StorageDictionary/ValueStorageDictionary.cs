@@ -196,15 +196,15 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
-		public object GetValue(string key)
+		public SaveableValueSection GetValue(string key)
 		{
 			SaveableValueSection readValue;
 			if(_keyToNormalValue.TryGetValue(key, out readValue))
 			{
-				return readValue.GetValue();
+				return readValue;
 			}
 
-			return null;
+			return default;
 		}
 
 		public void RemoveValue(string key)

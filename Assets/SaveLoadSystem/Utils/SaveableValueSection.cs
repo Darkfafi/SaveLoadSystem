@@ -27,5 +27,20 @@ namespace RDP.SaveLoadSystem.Internal
 		{
 			return Type.GetType(ValueType);
 		}
+
+		public Type GetSafeValueType()
+		{
+			if (string.IsNullOrEmpty(ValueType))
+				return null;
+
+			try
+			{
+				return Type.GetType(ValueType);
+			}
+			catch
+			{
+				return null;
+			}
+		}
 	}
 }

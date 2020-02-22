@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace RDP.SaveLoadSystem
+namespace RDP.SaveLoadSystem.Internal
 {
 	public interface IStorageDictionaryEditor : IReferenceStorageDictionaryEditor, IValueStorageDictionaryEditor
 	{
@@ -24,7 +24,7 @@ namespace RDP.SaveLoadSystem
 	{
 		string[] GetValueStorageKeys();
 		void SetValue(string key, object value);
-		object GetValue(string key);
+		SaveableValueSection GetValue(string key);
 		void RemoveValue(string key);
 		void RelocateValue(string currentKey, string newKey);
 	}

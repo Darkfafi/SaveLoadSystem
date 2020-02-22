@@ -7,9 +7,9 @@ namespace RDP.SaveLoadSystem.Internal
 {
 	public static class StorageKeySearcher
 	{
-		public static Dictionary<Type, StorageKeyEntry[]> GetSaveablesToKeyEntries()
+		public static Dictionary<Type, Dictionary<string, StorageKeyEntry>> GetSaveablesToKeyEntries()
 		{
-			Dictionary<Type, StorageKeyEntry[]> entries = new Dictionary<Type, StorageKeyEntry[]>();
+			Dictionary<Type, Dictionary<string, StorageKeyEntry>> entries = new Dictionary<Type, Dictionary<string, StorageKeyEntry>>();
 			Type[] saveableTypes = Assembly.GetAssembly(typeof(ISaveable)).GetTypes().Where(x => x.GetInterfaces().Any(y => typeof(ISaveable).IsAssignableFrom(y))).ToArray();
 			for(int i = 0; i < saveableTypes.Length; i++)
 			{
@@ -19,22 +19,24 @@ namespace RDP.SaveLoadSystem.Internal
 			return entries;
 		}
 
-		public static StorageKeyEntry[] GetKeyEntries(Type saveableType)
+		public static Dictionary<string, StorageKeyEntry> GetKeyEntries(Type saveableType)
 		{
 			if (saveableType == null)
-				return new StorageKeyEntry[] { };
+				return new Dictionary<string, StorageKeyEntry>();
 
 			FieldInfo[] fields = saveableType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
-			List<StorageKeyEntry> keyEntries = new List<StorageKeyEntry>();
+			Dictionary<string, StorageKeyEntry> keyEntries = new Dictionary<string, StorageKeyEntry>();
+			keyEntries.Add(Storage.STORAGE_REFERENCE_TYPE_STRING_KEY, new StorageKeyEntry(Storage.STORAGE_REFERENCE_TYPE_STRING_KEY, typeof(ISaveable), false));
 			foreach (FieldInfo fInfo in fields)
 			{
 				StorageKeyAttribute keyAttribute = fInfo.GetCustomAttribute<StorageKeyAttribute>(true);
 				if (keyAttribute != null)
 				{
-					keyEntries.Add(new StorageKeyEntry(fInfo.GetValue(null) as string, keyAttribute.ExpectedType, keyAttribute.IsOptional));
+					string key = fInfo.GetValue(null) as string;
+					keyEntries.Add(key, new StorageKeyEntry(key, keyAttribute.ExpectedType, keyAttribute.IsOptional));
 				}
 			}
-			return keyEntries.ToArray();
+			return keyEntries;
 		}
 
 		public struct StorageKeyEntry
@@ -59,6 +61,45 @@ namespace RDP.SaveLoadSystem.Internal
 				StorageKey = storageKey;
 				ExpectedType = expectedType;
 				IsOptional = isOptional;
+			}
+
+			public bool IsOfExpectedType(string targetTypeString)
+			{
+				Type safeType;
+
+				try
+				{
+					safeType = Type.GetType(targetTypeString);
+				}
+				catch
+				{
+					safeType = null;
+				}
+
+				return IsOfExpectedType(safeType);
+			}
+
+			public bool IsOfExpectedType(Type targetType)
+			{
+				if(targetType == null)
+					return false;
+
+				return ExpectedType.IsAssignableFrom(targetType);
+			}
+
+			public bool TryGetExpectedDictTypes(out Type keyType, out Type valueType)
+			{
+				if (!ExpectedType.IsInterface && ExpectedType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+				{
+					Type[] arguments = ExpectedType.GetGenericArguments();
+					keyType = arguments[0];
+					valueType = arguments[1];
+					return true;
+				}
+
+				keyType = null;
+				valueType = null;
+				return false;
 			}
 		}
 	}
