@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using static RDP.SaveLoadSystem.Internal.StorageKeySearcher;
@@ -118,6 +119,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 		private const string TYPE_NOT_FOUND_INFO_MESSAGE = "Type not found in project";
 		private const string EXPECTED_TYPE_INFO_MESSAGE_F = "Expected type {0} but found type {1}";
+		private const string PARENT_CORRUPT_INFO_MESSAGE = "Parent is corrupt";
 
 		// Capsule == ID & Storage
 		// Ref == ID, Type & Storage
@@ -127,7 +129,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 		#region Value Items
 
-		private class StorageItem : BaseItem
+		private class StorageItem : BaseFoldoutItem
 		{
 			public ValKeyItem[] ValKeys
 			{
@@ -144,6 +146,47 @@ namespace RDP.SaveLoadSystem.Internal
 				get; private set;
 			}
 
+			public override string TitleInfo
+			{
+				get
+				{
+					
+					State worstState = State.Normal;
+					string info = string.Empty;
+					List<BaseKeyItem> keyItems = new List<BaseKeyItem>(ValKeys);
+					keyItems.AddRange(RefsKeys);
+
+					for (int i = 0; i < keyItems.Count; i++)
+					{
+						BaseKeyItem item = keyItems[i];
+						if (worstState < item.CorruptionState && !string.IsNullOrEmpty(item.TitleInfo))
+						{
+							worstState = item.CorruptionState;
+							info = item.TitleInfo;
+						}
+					}
+
+					StorageKeyEntry[] missingKeys = GetMissingKeyEntries();
+					if (missingKeys.Length > 0 && worstState != State.Error)
+					{
+						StringBuilder messageBuilder = new StringBuilder();
+						messageBuilder.AppendLine("The following keys are expected but not found:");
+						for(int i = 0; i < missingKeys.Length; i++)
+						{
+							messageBuilder.AppendLine(string.Concat("* ", missingKeys[i].StorageKey));
+						}
+						return messageBuilder.ToString();
+					}
+
+					if (!string.IsNullOrEmpty(info))
+					{
+						return info;
+					}
+
+					return base.TitleInfo;
+				}
+			}
+
 			public override State CorruptionState
 			{
 				get
@@ -151,11 +194,13 @@ namespace RDP.SaveLoadSystem.Internal
 					List<BaseKeyItem> keys = new List<BaseKeyItem>(ValKeys);
 					keys.AddRange(RefsKeys);
 					State worstKeysState = GetWorstState(keys.ToArray());
-					return GetWorstState(worstKeysState);
+					State missingEntriesState = GetMissingKeyEntries().Length > 0 ? State.Warning : State.Normal;
+					return GetWorstState(worstKeysState, missingEntriesState);
 				}
 			}
 
-			public StorageItem(string parentKey, IStorageDictionaryEditor storageDictionaryEditor, Dictionary<string, StorageKeyEntry> keyEntries) : base(parentKey)
+			public StorageItem(string parentKey, IStorageDictionaryEditor storageDictionaryEditor, Dictionary<string, StorageKeyEntry> keyEntries) 
+				: base(parentKey, string.Concat("Storage: (", parentKey, ")"), false)
 			{
 				KeyEntries = keyEntries;
 				if (storageDictionaryEditor != null)
@@ -166,7 +211,10 @@ namespace RDP.SaveLoadSystem.Internal
 					{
 						if(!keyEntries.TryGetValue(valKeys[i], out StorageKeyEntry valueEntry))
 						{
-							valueEntry = new StorageKeyEntry(valKeys[i], null, false);
+							valueEntry = new StorageKeyEntry()
+							{
+								StorageKey = valKeys[i],
+							};
 						}
 						ValKeys[i] = new ValKeyItem(valueEntry, storageDictionaryEditor.GetValue(valKeys[i]));
 					}
@@ -177,7 +225,10 @@ namespace RDP.SaveLoadSystem.Internal
 					{
 						if (!keyEntries.TryGetValue(refKeys[i], out StorageKeyEntry refEntry))
 						{
-							refEntry = new StorageKeyEntry(refKeys[i], null, false);
+							refEntry = new StorageKeyEntry()
+							{
+								StorageKey = refKeys[i],
+							};
 						}
 						RefsKeys[i] = new RefsKeyItem(refEntry, storageDictionaryEditor.GetValueRefs(refKeys[i]));
 					}
@@ -193,13 +244,37 @@ namespace RDP.SaveLoadSystem.Internal
 			{
 				for(int i = 0; i < ValKeys.Length; i++)
 				{
-					ValKeys[i].RenderGUI(layer + 1);
+					ValKeys[i].RenderGUI(layer);
 				}
 
 				for (int i = 0; i < RefsKeys.Length; i++)
 				{
-					RefsKeys[i].RenderGUI(layer + 1);
+					RefsKeys[i].RenderGUI(layer);
 				}
+			}
+
+			private StorageKeyEntry[] GetMissingKeyEntries()
+			{
+				List<StorageKeyEntry> missingEntries = new List<StorageKeyEntry>(KeyEntries.Select(x => x.Value).Where(x => !x.IsOptional));
+				for (int i = 0; i < ValKeys.Length; i++)
+				{
+					StorageKeyEntry entry = missingEntries.Find(x => x.StorageKey == ValKeys[i].Key);
+					if(entry.IsValid)
+					{
+						missingEntries.Remove(entry);
+					}
+				}
+
+				for (int i = 0; i < RefsKeys.Length; i++)
+				{
+					StorageKeyEntry entry = missingEntries.Find(x => x.StorageKey == RefsKeys[i].Key);
+					if (entry.IsValid)
+					{
+						missingEntries.Remove(entry);
+					}
+				}
+
+				return missingEntries.ToArray();
 			}
 		}
 
@@ -268,12 +343,16 @@ namespace RDP.SaveLoadSystem.Internal
 				StorageItem = new StorageItem(keyEntry.StorageKey, _editableRefValue.Storage, GetKeyEntries(_editableRefValue.ReferenceType));
 			}
 
+			public string GetInfoText()
+			{
+				return GetTypeInfoText();
+			}
+
 			protected override void OnRenderGUI(int layer)
 			{
 				DrawNormalItemLabel(string.Concat("- ID: ", ID));
 				DrawItemLabel(string.Concat("- Type: ", GetTypeString(_editableRefValue.ReferenceType, _editableRefValue.ReferenceTypeString)), GetTypeInfoText(), GetTypeCurruptionState());
-				DrawItemLabel("- Storage: ", string.Empty, StorageItem.CorruptionState);
-				StorageItem.RenderGUI(layer + 1);
+				StorageItem.RenderGUI(layer);
 			}
 
 			private string GetTypeInfoText()
@@ -281,6 +360,10 @@ namespace RDP.SaveLoadSystem.Internal
 				if (_editableRefValue.ReferenceType == null)
 				{
 					return TYPE_NOT_FOUND_INFO_MESSAGE;
+				}
+				else if (!_keyEntry.IsValid)
+				{
+					return PARENT_CORRUPT_INFO_MESSAGE;
 				}
 				else
 				{
@@ -293,6 +376,10 @@ namespace RDP.SaveLoadSystem.Internal
 				if (_editableRefValue.ReferenceType == null)
 				{
 					return State.Error;
+				}
+				else if(!_keyEntry.IsValid)
+				{
+					return State.Warning;
 				}
 				else
 				{
@@ -353,8 +440,15 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 			}
 
-			private void GetCorruptStateWithInfo(out State state, out string info)
+			public void GetCorruptStateWithInfo(out State state, out string info)
 			{
+				if(!_keyEntry.IsValid)
+				{
+					state = State.Warning;
+					info = PARENT_CORRUPT_INFO_MESSAGE;
+					return;
+				}
+
 				if (Storage.STORAGE_REFERENCE_TYPE_STRING_KEY == _keyEntry.StorageKey)
 				{
 					state = _keyEntry.IsOfExpectedType(_valueSection.ValueString) ? State.Normal : State.Error;
@@ -457,6 +551,25 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 			}
 
+			public override string TitleInfo
+			{
+				get
+				{
+					string infoText = string.Empty;
+					if(RefItems.Length > 0)
+					{
+						infoText = RefItems[0].GetInfoText();
+					}
+
+					if (string.IsNullOrEmpty(infoText))
+					{
+						return base.TitleInfo;
+					}
+
+					return infoText;
+				}
+			}
+
 			public RefsKeyItem(StorageKeyEntry keyEntry, EditableRefValue[] refs) : base(keyEntry.StorageKey)
 			{
 				RefItems = new RefItem[refs.Length];
@@ -499,6 +612,19 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 			}
 
+			public override string TitleInfo
+			{
+				get
+				{
+					ValItem.GetCorruptStateWithInfo(out _, out string info);
+					if(string.IsNullOrEmpty(info))
+					{
+						return base.TitleInfo;
+					}
+					return info;
+				}
+			}
+
 			public ValKeyItem(StorageKeyEntry keyEntry, SaveableValueSection value) : base(keyEntry.StorageKey)
 			{
 				ValItem = new ValItem(keyEntry, value);
@@ -534,6 +660,19 @@ namespace RDP.SaveLoadSystem.Internal
 				get; private set;
 			}
 
+			public virtual string TitleInfo
+			{
+				get
+				{
+					return string.Empty;
+				}
+			}
+
+			public BaseFoldoutItem(string key, string title, bool defaultIsOpenValue) : this(key, defaultIsOpenValue)
+			{
+				Title = title;
+			}
+
 			public BaseFoldoutItem(string key, bool defaultIsOpenValue) : base(key)
 			{
 				Title = key;
@@ -554,7 +693,19 @@ namespace RDP.SaveLoadSystem.Internal
 					foldoutStyle.normal.textColor = color.Value;
 				}
 
-				IsOpen = EditorGUILayout.Foldout(IsOpen, Title + " " + GetCorruptionStateIcon(CorruptionState), foldoutStyle);
+				GUIContent titleContent;
+				string titleValue = string.Concat(Title, " ", GetCorruptionStateIcon(CorruptionState));
+
+				if(string.IsNullOrEmpty(TitleInfo))
+				{
+					titleContent = new GUIContent(titleValue);
+				}
+				else
+				{
+					titleContent = new GUIContent(titleValue, TitleInfo);
+				}
+
+				IsOpen = EditorGUILayout.Foldout(IsOpen, titleContent, foldoutStyle);
 				GUILayout.EndHorizontal();
 
 				if (IsOpen)

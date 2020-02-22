@@ -41,17 +41,11 @@ namespace RDP.SaveLoadSystem.Internal
 
 		public struct StorageKeyEntry
 		{
-			public string StorageKey
-			{
-				get; private set;
-			}
+			public string StorageKey;
+			public Type ExpectedType;
+			public bool IsOptional;
 
-			public Type ExpectedType
-			{
-				get; private set;
-			}
-
-			public bool IsOptional
+			public bool IsValid
 			{
 				get; private set;
 			}
@@ -61,6 +55,7 @@ namespace RDP.SaveLoadSystem.Internal
 				StorageKey = storageKey;
 				ExpectedType = expectedType;
 				IsOptional = isOptional;
+				IsValid = true;
 			}
 
 			public bool IsOfExpectedType(string targetTypeString)
