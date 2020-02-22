@@ -12,9 +12,6 @@ namespace RDP.SaveLoadSystem.Internal
 {
 	public class StorageInspectorEditor : EditorWindow
 	{
-		private const string TYPE_NOT_FOUND_INFO_MESSAGE = "Type not found in project";
-		private const string EXPECTED_TYPE_INFO_MESSAGE_F = "Expected type {0} but found type {1}";
-
 		private Storage _currentlyViewingStorage = null;
 		private List<CapsuleItem> _capsuleUIItems = new List<CapsuleItem>();
 
@@ -35,7 +32,6 @@ namespace RDP.SaveLoadSystem.Internal
 		protected void Awake()
 		{
 			RefreshStorageCapsuleInstances();
-			StorageKeySearcher.GetSaveablesToKeyEntries();
 		}
 
 		protected void OnGUI()
@@ -118,7 +114,10 @@ namespace RDP.SaveLoadSystem.Internal
 			}
 		}
 
-		#region UI New
+		#region UI Items
+
+		private const string TYPE_NOT_FOUND_INFO_MESSAGE = "Type not found in project";
+		private const string EXPECTED_TYPE_INFO_MESSAGE_F = "Expected type {0} but found type {1}";
 
 		// Capsule == ID & Storage
 		// Ref == ID, Type & Storage
@@ -126,7 +125,7 @@ namespace RDP.SaveLoadSystem.Internal
 		// Storage == Keys > Values & Keys > Refs
 		// A Key can hold 1 or more Refs or Values
 
-		#region Items
+		#region Value Items
 
 		private class StorageItem : BaseItem
 		{
@@ -511,6 +510,10 @@ namespace RDP.SaveLoadSystem.Internal
 			}
 		}
 
+		#endregion
+
+		#region Base Items
+
 		private abstract class BaseKeyItem : BaseFoldoutItem
 		{
 			public BaseKeyItem(string key) : base(key, false)
@@ -518,10 +521,6 @@ namespace RDP.SaveLoadSystem.Internal
 
 			}
 		}
-
-		#endregion
-
-		#endregion
 
 		private abstract class BaseFoldoutItem : BaseItem
 		{
@@ -644,14 +643,14 @@ namespace RDP.SaveLoadSystem.Internal
 				string icon = GetCorruptionStateIcon(curruptionState);
 				Color? color = GetCorruptionStateColor(curruptionState);
 
-				if(color.HasValue)
+				if (color.HasValue)
 				{
 					labelStyle.normal.textColor = color.Value;
 				}
 
 				GUIContent labelContent;
 
-				if(string.IsNullOrEmpty(infoText))
+				if (string.IsNullOrEmpty(infoText))
 				{
 					labelContent = new GUIContent(string.Concat(labelValue, " ", icon));
 				}
@@ -701,5 +700,9 @@ namespace RDP.SaveLoadSystem.Internal
 				return state;
 			}
 		}
+
+		#endregion
+
+		#endregion
 	}
 }
