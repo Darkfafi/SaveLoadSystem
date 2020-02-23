@@ -28,7 +28,7 @@ namespace RDP.SaveLoadSystem
 					if (preMigrationLevel != migratorLevelIndex)
 					{
 						storageResult.CapsuleStorage.SetValue(MIGRATOR_INDEX_KEY, migratorLevelIndex);
-						storage.FlushRefresh(pair.Key);
+						storage.Flush(pair.Key);
 					}
 				}
 			}
@@ -55,7 +55,7 @@ namespace RDP.SaveLoadSystem
 					if (preMigrationLevel != migratorLevelIndex)
 					{
 						storageResult.CapsuleStorage.SetValue(MIGRATOR_INDEX_KEY, migratorLevelIndex);
-						storage.FlushRefresh(pair.Key);
+						storage.Flush(pair.Key);
 					}
 				}
 			}

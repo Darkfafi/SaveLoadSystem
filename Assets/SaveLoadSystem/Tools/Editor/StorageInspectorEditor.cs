@@ -38,8 +38,22 @@ namespace RDP.SaveLoadSystem.Internal
 
 		protected void OnGUI()
 		{
+			EditorGUILayout.BeginHorizontal();
 			EditorGUILayout.LabelField("Save Files Directory Path:");
 			_pathInputValue = EditorGUILayout.TextField(_pathInputValue);
+			if (GUILayout.Button("Try Open Location"))
+			{
+				string path = Storage.GetPathToStorage(_pathInputValue);
+				if (System.IO.Directory.Exists(path))
+				{
+					EditorUtility.RevealInFinder(path);
+				}
+				else
+				{
+					Debug.LogWarning($"Path {path} does not exist!");
+				}
+			}
+			EditorGUILayout.EndHorizontal();
 
 			EditorGUILayout.LabelField("Encoding Type:");
 			_encodingTypeInputValue = (Storage.EncodingType)EditorGUILayout.EnumPopup(_encodingTypeInputValue);

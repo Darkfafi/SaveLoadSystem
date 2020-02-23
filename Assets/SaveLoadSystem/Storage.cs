@@ -294,12 +294,6 @@ namespace RDP.SaveLoadSystem
 				Flush(storageCapsuleIDs);
 		}
 
-		public void FlushRefresh(params string[] storageCapsuleIDs)
-		{
-			Flush(storageCapsuleIDs);
-			RefreshCachedData(storageCapsuleIDs);
-		}
-
 		public void Flush(params string[] storageCapsuleIDs)
 		{
 			foreach (var capsuleMapItem in _cachedStorageCapsules)
