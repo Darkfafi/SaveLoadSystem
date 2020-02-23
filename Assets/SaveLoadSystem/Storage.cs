@@ -462,6 +462,11 @@ namespace RDP.SaveLoadSystem
 
 		public EditableRefValue GetEditableRefValue(string storageCapsuleID, string refID)
 		{
+			if(string.IsNullOrEmpty(refID))
+			{
+				return default;
+			}
+
 			foreach(var item in _cachedStorageCapsules)
 			{
 				if(item.Key.ID == storageCapsuleID)
@@ -479,7 +484,7 @@ namespace RDP.SaveLoadSystem
 				}
 			}
 
-			return default(EditableRefValue);
+			return default;
 		}
 
 		public EditableRefValue RegisterNewRefInCapsule(string storageCapsuleID, Type referenceType)
