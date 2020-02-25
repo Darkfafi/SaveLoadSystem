@@ -2,6 +2,7 @@
 
 namespace RDP.SaveLoadSystem
 {
+	[AttributeUsage(AttributeTargets.Field)]
 	public class StorageKeyAttribute : Attribute
 	{
 		public Type ExpectedType
@@ -18,6 +19,20 @@ namespace RDP.SaveLoadSystem
 		{
 			ExpectedType = expectedType;
 			IsOptional = isOptional;
+		}
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	public class StorageKeysHolderAttribute : Attribute
+	{
+		public Type ContainerForType
+		{
+			get; private set;
+		}
+
+		public StorageKeysHolderAttribute(Type containerForType)
+		{
+			ContainerForType = containerForType;
 		}
 	}
 }

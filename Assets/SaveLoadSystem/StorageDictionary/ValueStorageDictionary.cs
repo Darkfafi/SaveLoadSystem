@@ -5,8 +5,10 @@ using System.Collections.Generic;
 
 namespace RDP.SaveLoadSystem
 {
+	[StorageKeysHolder(typeof(ISaveable))]
 	public class ValueStorageDictionary : IStorageValueSaver, IStorageValueLoader, IValueStorageDictionaryEditor
 	{
+		[StorageKey(typeof(string[]), true)]
 		public const string VALUE_KEYS_TO_KEEP_KEY = "RESERVED_VALUE_KEYS_TO_KEEP_KEY_RESERVED";
 
 		public string ParentStorageCapsuleID

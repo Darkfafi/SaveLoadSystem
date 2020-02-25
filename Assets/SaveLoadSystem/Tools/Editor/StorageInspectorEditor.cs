@@ -134,7 +134,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 		private const string TYPE_NOT_FOUND_INFO_MESSAGE = "Type not found in project";
 		private const string EXPECTED_TYPE_INFO_MESSAGE_F = "Expected type {0} but found type {1}";
-		private const string PARENT_CORRUPT_INFO_MESSAGE = "Parent is corrupt";
+		private const string KEY_VALIDATION_CORRUPT_INFO_MESSAGE = "Key Validation is corrupt";
 
 		// Capsule == ID & Storage
 		// Ref == ID, Type & Storage
@@ -378,7 +378,7 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 				else if (!_keyEntry.IsValid)
 				{
-					return PARENT_CORRUPT_INFO_MESSAGE;
+					return KEY_VALIDATION_CORRUPT_INFO_MESSAGE;
 				}
 				else
 				{
@@ -483,7 +483,7 @@ namespace RDP.SaveLoadSystem.Internal
 				if(!_keyEntry.IsValid)
 				{
 					state = State.Warning;
-					info = PARENT_CORRUPT_INFO_MESSAGE;
+					info = KEY_VALIDATION_CORRUPT_INFO_MESSAGE;
 					return;
 				}
 

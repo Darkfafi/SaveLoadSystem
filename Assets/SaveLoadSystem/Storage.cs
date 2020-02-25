@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
+	[StorageKeysHolder(typeof(ISaveable))]
 	public class Storage : IStorageAccess
 	{
 		public enum EncodingType
@@ -17,6 +18,7 @@ namespace RDP.SaveLoadSystem
 		}
 
 		public const string ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID = "ID_CAPSULE_SAVE_DATA";
+		[StorageKey(typeof(ISaveable))]
 		public const string STORAGE_REFERENCE_TYPE_STRING_KEY = "RESERVED_REFERENCE_TYPE_FULL_NAME_STRING_RESERVED";
 		public const string SAVE_FILE_EXTENSION = "rdpsf";
 

@@ -7,14 +7,6 @@ namespace RDP.SaveLoadSystem.Internal
 {
 	public static class StorageKeySearcher
 	{
-		private static Dictionary<string, StorageKeyEntry> EXCPECTION_KEY_ENTRIES = new Dictionary<string, StorageKeyEntry>()
-		{
-			{ Storage.STORAGE_REFERENCE_TYPE_STRING_KEY,  new StorageKeyEntry(Storage.STORAGE_REFERENCE_TYPE_STRING_KEY, typeof(ISaveable), false) },
-			{ Migrator.MIGRATOR_INDEX_KEY,  new StorageKeyEntry(Migrator.MIGRATOR_INDEX_KEY, typeof(int), true) },
-			{ ValueStorageDictionary.VALUE_KEYS_TO_KEEP_KEY,  new StorageKeyEntry(ValueStorageDictionary.VALUE_KEYS_TO_KEEP_KEY, typeof(string[]), true) },
-			{ StorageDictionary.REF_KEYS_TO_KEEP_KEY,  new StorageKeyEntry(StorageDictionary.REF_KEYS_TO_KEEP_KEY, typeof(string[]), true) },
-		};
-
 		public static Dictionary<Type, Dictionary<string, StorageKeyEntry>> GetSaveablesToKeyEntries()
 		{
 			Dictionary<Type, Dictionary<string, StorageKeyEntry>> entries = new Dictionary<Type, Dictionary<string, StorageKeyEntry>>();
@@ -35,11 +27,27 @@ namespace RDP.SaveLoadSystem.Internal
 			FieldInfo[] fields = saveableType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
 			Dictionary<string, StorageKeyEntry> keyEntries = new Dictionary<string, StorageKeyEntry>();
 
-			foreach(var exceptionPair in EXCPECTION_KEY_ENTRIES)
+			// Add keys of StorageKeysHolders (holding keys for other types)
+			StorageKeysHolderAttribute ska = saveableType.GetCustomAttribute<StorageKeysHolderAttribute>(false);
+			if (ska == null || !ska.ContainerForType.IsAssignableFrom(saveableType))
 			{
-				keyEntries.Add(exceptionPair.Key, exceptionPair.Value);
+				Type[] storageKeysHolders = Assembly.GetAssembly(typeof(StorageKeysHolderAttribute)).GetTypes().Where(x => 
+				{
+					StorageKeysHolderAttribute attr = x.GetCustomAttribute<StorageKeysHolderAttribute>(false);
+					return attr != null && attr.ContainerForType.IsAssignableFrom(saveableType);
+				}).ToArray();
+
+				for(int i = 0; i < storageKeysHolders.Length; i++)
+				{
+					Dictionary<string, StorageKeyEntry> storageKeysHolderEntries = GetKeyEntries(storageKeysHolders[i]);
+					foreach (var newKeyEntry in storageKeysHolderEntries)
+					{
+						keyEntries.Add(newKeyEntry.Key, newKeyEntry.Value);
+					}
+				}
 			}
 
+			// Add keys of the saveable itself
 			foreach (FieldInfo fInfo in fields)
 			{
 				StorageKeyAttribute keyAttribute = fInfo.GetCustomAttribute<StorageKeyAttribute>(true);

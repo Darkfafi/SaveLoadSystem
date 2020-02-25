@@ -6,8 +6,10 @@ using UnityEngine;
 
 namespace RDP.SaveLoadSystem
 {
+	[StorageKeysHolder(typeof(ISaveable))]
 	public class StorageDictionary : ValueStorageDictionary, IStorageSaver, IStorageLoader, IStorageDictionaryEditor
 	{
+		[StorageKey(typeof(string[]), true)]
 		public const string REF_KEYS_TO_KEEP_KEY = "RESERVED_REF_KEYS_TO_KEEP_KEY_RESERVED";
 
 		private Dictionary<string, object> _keyToReferenceID;

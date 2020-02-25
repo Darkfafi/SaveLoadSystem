@@ -3,8 +3,10 @@ using System.Collections.Generic;
 
 namespace RDP.SaveLoadSystem
 {
+	[StorageKeysHolder(typeof(ISaveable))]
 	public class Migrator
 	{
+		[StorageKey(typeof(int), true)]
 		public const string MIGRATOR_INDEX_KEY = "RESERVED_MIGRATOR_INDEX_KEY_RESERVED";
 
 		public static void Do(Storage storage, Migration[] migrations)
