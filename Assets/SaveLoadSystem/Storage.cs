@@ -17,9 +17,10 @@ namespace RDP.SaveLoadSystem
 			Base64,
 		}
 
-		public const string ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID = "ID_CAPSULE_SAVE_DATA";
 		[StorageKey(typeof(ISaveable))]
 		public const string STORAGE_REFERENCE_TYPE_STRING_KEY = "RESERVED_REFERENCE_TYPE_FULL_NAME_STRING_RESERVED";
+
+		public const string ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID = "ID_CAPSULE_SAVE_DATA";
 		public const string SAVE_FILE_EXTENSION = "rdpsf";
 
 		public SaveableReferenceIdHandler ActiveRefHandler
@@ -349,6 +350,59 @@ namespace RDP.SaveLoadSystem
 			}
 		}
 
+		public EditableRefValue GetEditableRefValue(string storageCapsuleID, string refID)
+		{
+			if (string.IsNullOrEmpty(refID))
+			{
+				return default;
+			}
+
+			foreach (var item in _cachedStorageCapsules)
+			{
+				if (item.Key.ID == storageCapsuleID)
+				{
+					StorageDictionary storageForRef;
+					if (item.Value.TryGetValue(refID, out storageForRef))
+					{
+						string referenceTypeString;
+						if (storageForRef.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out referenceTypeString))
+						{
+							return new EditableRefValue(refID, referenceTypeString, storageForRef);
+						}
+					}
+					break;
+				}
+			}
+
+			return default;
+		}
+
+		public EditableRefValue RegisterNewRefInCapsule(string storageCapsuleID, Type referenceType)
+		{
+			IStorageCapsule capsuleToEdit = null;
+			EditableRefValue editableRefValue = default(EditableRefValue);
+
+			foreach (var item in _cachedStorageCapsules)
+			{
+				if (item.Key.ID == storageCapsuleID)
+				{
+					StorageDictionary storageForRef = new StorageDictionary(storageCapsuleID, this);
+					storageForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceType.AssemblyQualifiedName);
+					string randomOnFlyID = Guid.NewGuid().ToString("N");
+					editableRefValue = new EditableRefValue(randomOnFlyID, referenceType.AssemblyQualifiedName, storageForRef);
+					capsuleToEdit = item.Key;
+					break;
+				}
+			}
+
+			if (editableRefValue.IsValidRefValue && capsuleToEdit != null)
+			{
+				_cachedStorageCapsules[capsuleToEdit].Add(editableRefValue.ReferenceID, editableRefValue.Storage as StorageDictionary);
+			}
+
+			return editableRefValue;
+		}
+
 		private void RefreshCachedData(string[] capsuleIDs)
 		{
 			List<IStorageCapsule> capsules = new List<IStorageCapsule>();
@@ -454,59 +508,6 @@ namespace RDP.SaveLoadSystem
 		private bool ValidateEncryptionPassword(string password, string fileText)
 		{
 			return password == GetEncryptionPassword(fileText);
-		}
-
-		public EditableRefValue GetEditableRefValue(string storageCapsuleID, string refID)
-		{
-			if(string.IsNullOrEmpty(refID))
-			{
-				return default;
-			}
-
-			foreach(var item in _cachedStorageCapsules)
-			{
-				if(item.Key.ID == storageCapsuleID)
-				{
-					StorageDictionary storageForRef;
-					if(item.Value.TryGetValue(refID, out storageForRef))
-					{
-						string referenceTypeString;
-						if(storageForRef.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out referenceTypeString))
-						{
-							return new EditableRefValue(refID, referenceTypeString, storageForRef);
-						}
-					}
-					break;
-				}
-			}
-
-			return default;
-		}
-
-		public EditableRefValue RegisterNewRefInCapsule(string storageCapsuleID, Type referenceType)
-		{
-			IStorageCapsule capsuleToEdit = null;
-			EditableRefValue editableRefValue = default(EditableRefValue);
-
-			foreach(var item in _cachedStorageCapsules)
-			{
-				if(item.Key.ID == storageCapsuleID)
-				{
-					StorageDictionary storageForRef = new StorageDictionary(storageCapsuleID, this);
-					storageForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceType.AssemblyQualifiedName);
-					string randomOnFlyID = Guid.NewGuid().ToString("N");
-					editableRefValue = new EditableRefValue(randomOnFlyID, referenceType.AssemblyQualifiedName, storageForRef);
-					capsuleToEdit = item.Key;
-					break;
-				}
-			}
-
-			if(editableRefValue.IsValidRefValue && capsuleToEdit != null)
-			{
-				_cachedStorageCapsules[capsuleToEdit].Add(editableRefValue.ReferenceID, editableRefValue.Storage as StorageDictionary);
-			}
-
-			return editableRefValue;
 		}
 	}
 

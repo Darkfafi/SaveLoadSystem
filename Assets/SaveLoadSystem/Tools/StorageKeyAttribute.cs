@@ -2,7 +2,7 @@
 
 namespace RDP.SaveLoadSystem
 {
-	[AttributeUsage(AttributeTargets.Field)]
+	[AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
 	public class StorageKeyAttribute : Attribute
 	{
 		public Type ExpectedType
@@ -22,7 +22,7 @@ namespace RDP.SaveLoadSystem
 		}
 	}
 
-	[AttributeUsage(AttributeTargets.Class)]
+	[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 	public class StorageKeysHolderAttribute : Attribute
 	{
 		public Type ContainerForType
