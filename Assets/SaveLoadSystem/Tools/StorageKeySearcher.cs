@@ -27,43 +27,57 @@ namespace RDP.SaveLoadSystem.Internal
 			FieldInfo[] fields = saveableType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
 			Dictionary<string, StorageKeyEntry> keyEntries = new Dictionary<string, StorageKeyEntry>();
 
-			// Add keys of StorageKeysHolders (holding keys for other types)
-			StorageKeysHolderAttribute ska = saveableType.GetCustomAttribute<StorageKeysHolderAttribute>(false);
-			if (ska == null || !ska.ContainerForType.IsAssignableFrom(saveableType))
-			{
-				Type[] storageKeysHolders = Assembly.GetAssembly(typeof(StorageKeysHolderAttribute)).GetTypes().Where(x => 
-				{
-					StorageKeysHolderAttribute attr = x.GetCustomAttribute<StorageKeysHolderAttribute>(false);
-					return attr != null && attr.ContainerForType.IsAssignableFrom(saveableType);
-				}).ToArray();
-
-				for(int i = 0; i < storageKeysHolders.Length; i++)
-				{
-					Dictionary<string, StorageKeyEntry> storageKeysHolderEntries = GetKeyEntries(storageKeysHolders[i]);
-					foreach (var newKeyEntry in storageKeysHolderEntries)
-					{
-						keyEntries.Add(newKeyEntry.Key, newKeyEntry.Value);
-					}
-				}
-			}
-
 			// Add keys of the saveable itself
 			foreach (FieldInfo fInfo in fields)
 			{
 				StorageKeyAttribute keyAttribute = fInfo.GetCustomAttribute<StorageKeyAttribute>(true);
 				if (keyAttribute != null)
 				{
-					string key = fInfo.GetValue(null) as string;
-					keyEntries.Add(key, new StorageKeyEntry(key, keyAttribute.ExpectedType, keyAttribute.IsOptional));
+					StorageKeyEntry entry = new StorageKeyEntry(fInfo.GetValue(null) as string, keyAttribute.ExpectedType, keyAttribute.IsOptional);
+					AddKeyEntry(keyEntries, entry);
+				}
+			}
+
+			// Add keys of StorageKeysHolders (holding keys for other types)
+			StorageKeysHolderAttribute ska = saveableType.GetCustomAttribute<StorageKeysHolderAttribute>(false);
+			if (ska == null || !ska.ContainerForType.IsAssignableFrom(saveableType))
+			{
+				Type[] storageKeysHolders = Assembly.GetAssembly(typeof(StorageKeysHolderAttribute)).GetTypes().Where(x =>
+				{
+					StorageKeysHolderAttribute attr = x.GetCustomAttribute<StorageKeysHolderAttribute>(false);
+					return attr != null && attr.ContainerForType.IsAssignableFrom(saveableType);
+				}).ToArray();
+
+				for (int i = 0; i < storageKeysHolders.Length; i++)
+				{
+					Dictionary<string, StorageKeyEntry> storageKeysHolderEntries = GetKeyEntries(storageKeysHolders[i]);
+					foreach (var newKeyEntryPair in storageKeysHolderEntries)
+					{
+						AddKeyEntry(keyEntries, newKeyEntryPair.Value);
+					}
 				}
 			}
 			return keyEntries;
+		}
+
+		private static void AddKeyEntry(Dictionary<string, StorageKeyEntry> entries, StorageKeyEntry entry)
+		{
+			if (!entries.ContainsKey(entry.StorageKey))
+			{
+				entries.Add(entry.StorageKey, entry);
+			}
+			else
+			{
+				entry.HasDuplicate = true;
+				entries[entry.StorageKey] = entry;
+			}
 		}
 
 		public struct StorageKeyEntry
 		{
 			public string StorageKey;
 			public bool IsOptional;
+			public bool HasDuplicate;
 
 			public bool IsValid
 			{
@@ -77,6 +91,7 @@ namespace RDP.SaveLoadSystem.Internal
 				StorageKey = storageKey;
 				_expectedType = expectedType;
 				IsOptional = isOptional;
+				HasDuplicate = false;
 				IsValid = true;
 			}
 

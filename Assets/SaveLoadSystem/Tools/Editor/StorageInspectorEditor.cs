@@ -13,27 +13,112 @@ namespace RDP.SaveLoadSystem.Internal
 {
 	public class StorageInspectorEditor : EditorWindow
 	{
+		[Flags]
+		public enum CorruptionState
+		{
+			None	= 1,
+			Warning = 2,
+			Error	= 4
+		}
+
+		// Current Display Variables
 		private Storage _currentlyViewingStorage = null;
 		private List<CapsuleItem> _capsuleUIItems = new List<CapsuleItem>();
 
-		private List<IStorageCapsule> _iStorageCapsuleInstances = new List<IStorageCapsule>();
-		private List<string> _capsuleIDs = new List<string>();
-
+		// Editor Variables
 		private Vector2 _scroll = Vector2.zero;
 		private string _pathInputValue = string.Empty;
 		private Storage.EncodingType _encodingTypeInputValue = Storage.EncodingType.Base64;
 
+		private static StorageInspectorEditor _currentlyOpenStorageInspector = null;
+
+		public static CorruptionState ValidateStorage(string storagePath, Storage.EncodingType encodingType, CorruptionState openOnState = CorruptionState.Warning | CorruptionState.Error)
+		{
+			CorruptionState worstCorruptionState = CorruptionState.None;
+			IStorageCapsule[] capsuleInstances = GetStorageCapsuleInstances();
+			CapsuleItem[] capsuleItems = LoadCapsuleItems(storagePath, encodingType, capsuleInstances);
+			for(int i = 0; i < capsuleItems.Length; i++)
+			{
+				CapsuleItem capsuleItem = capsuleItems[i];
+
+				if(worstCorruptionState < capsuleItem.CorruptionState)
+				{
+					worstCorruptionState = capsuleItem.CorruptionState;
+				}
+
+				if(openOnState.HasFlag(worstCorruptionState))
+				{
+					OpenWindow().LoadStorage(storagePath, encodingType);
+				}
+			}
+
+			return worstCorruptionState;
+		}
+
+		private static CapsuleItem[] LoadCapsuleItems(string storagePath, Storage.EncodingType encodingType, IStorageCapsule[] storageCapsules)
+		{
+			List<CapsuleItem> loadedItems = new List<CapsuleItem>();
+			Storage storage = new Storage(storagePath, encodingType, storageCapsules);
+			List<ReadStorageResult> results = storage.Read(storageCapsules.Select(x => x.ID).ToArray());
+
+			for (int i = 0; i < results.Count; i++)
+			{
+				ReadStorageResult result = results[i];
+				IStorageCapsule storageCapsuleInstance = storageCapsules.FirstOrDefault(x => x.ID == result.CapsuleID);
+				if (storageCapsuleInstance != null)
+				{
+					Dictionary<string, StorageKeyEntry> keyEntries = new Dictionary<string, StorageKeyEntry>();
+					if (storageCapsuleInstance != null)
+					{
+						keyEntries = GetKeyEntries(storageCapsuleInstance.GetType());
+					}
+					loadedItems.Add(new CapsuleItem(result.CapsuleID, result.CapsuleStorage, keyEntries));
+				}
+			}
+
+			return loadedItems.ToArray();
+		}
+
+		private static IStorageCapsule[] GetStorageCapsuleInstances()
+		{
+			List<IStorageCapsule> storageCapsules = new List<IStorageCapsule>();
+			Type[] storageCapsuleTypes = Assembly.GetAssembly(typeof(IStorageCapsule)).GetTypes().Where(x => x.GetInterfaces().Contains(typeof(IStorageCapsule))).ToArray();
+			for (int i = 0; i < storageCapsuleTypes.Length; i++)
+			{
+				IStorageCapsule instance = Activator.CreateInstance(storageCapsuleTypes[i]) as IStorageCapsule;
+				if (instance != null)
+				{
+					storageCapsules.Add(instance);
+				}
+			}
+			return storageCapsules.ToArray();
+		}
+
 		[MenuItem(InternalConsts.MENU_ITEM_PREFIX + "Storage/Storage Inspector")]
 		private static void Init()
 		{
+			OpenWindow();
+		}
+
+		private static StorageInspectorEditor OpenWindow()
+		{
+			if(_currentlyOpenStorageInspector != null)
+			{
+				_currentlyOpenStorageInspector.Focus();
+				return _currentlyOpenStorageInspector;
+			}
+
 			StorageInspectorEditor window = GetWindow<StorageInspectorEditor>();
 			window.titleContent = new GUIContent("Storage Inspector");
 			window.Show();
+			window.Focus();
+			_currentlyOpenStorageInspector = window;
+			return window;
 		}
 
 		protected void Awake()
 		{
-			RefreshStorageCapsuleInstances();
+			AssemblyReloadEvents.beforeAssemblyReload += Close;
 		}
 
 		protected void OnGUI()
@@ -84,50 +169,18 @@ namespace RDP.SaveLoadSystem.Internal
 
 		protected void OnDestroy()
 		{
-			_iStorageCapsuleInstances.Clear();
-			_capsuleIDs.Clear();
+			AssemblyReloadEvents.beforeAssemblyReload -= Close;
+			_currentlyOpenStorageInspector = null;
 			_capsuleUIItems = null;
 			_currentlyViewingStorage = null;
 		}
 
-		private void LoadStorage(string path, Storage.EncodingType encodingType)
+		public void LoadStorage(string path, Storage.EncodingType encodingType)
 		{
-			RefreshStorageCapsuleInstances();
-			_currentlyViewingStorage = new Storage(path, encodingType, _iStorageCapsuleInstances.ToArray());
-			ReadStorageResult[] results = _currentlyViewingStorage.Read(_capsuleIDs.ToArray()).ToArray();
-
-			for (int i = 0; i < results.Length; i++)
-			{
-				ReadStorageResult result = results[i];
-
-				IStorageCapsule storageCapsuleInstance = _iStorageCapsuleInstances.Find(x => x.ID == result.CapsuleID);
-				Dictionary<string, StorageKeyEntry> keyEntries = new Dictionary<string, StorageKeyEntry>();
-
-
-				if (storageCapsuleInstance != null)
-				{
-					keyEntries = GetKeyEntries(storageCapsuleInstance.GetType());
-				}
-
-				_capsuleUIItems.Add(new CapsuleItem(result.CapsuleID, result.CapsuleStorage, keyEntries));
-			}
-		}
-
-		private void RefreshStorageCapsuleInstances()
-		{
-			_iStorageCapsuleInstances.Clear();
-			_capsuleIDs.Clear();
 			_capsuleUIItems.Clear();
-			Type[] storageCapsuleTypes = Assembly.GetAssembly(typeof(IStorageCapsule)).GetTypes().Where(x => x.GetInterfaces().Contains(typeof(IStorageCapsule))).ToArray();
-			for (int i = 0; i < storageCapsuleTypes.Length; i++)
-			{
-				IStorageCapsule instance = Activator.CreateInstance(storageCapsuleTypes[i]) as IStorageCapsule;
-				if (instance != null)
-				{
-					_iStorageCapsuleInstances.Add(instance);
-					_capsuleIDs.Add(instance.ID);
-				}
-			}
+			IStorageCapsule[] storageCapsuleInstances = GetStorageCapsuleInstances();
+			_currentlyViewingStorage = new Storage(path, encodingType, storageCapsuleInstances);
+			_capsuleUIItems.AddRange(LoadCapsuleItems(path, encodingType, storageCapsuleInstances));
 		}
 
 		#region UI Items
@@ -135,6 +188,7 @@ namespace RDP.SaveLoadSystem.Internal
 		private const string TYPE_NOT_FOUND_INFO_MESSAGE = "Type not found in project";
 		private const string EXPECTED_TYPE_INFO_MESSAGE_F = "Expected type {0} but found type {1}";
 		private const string KEY_VALIDATION_CORRUPT_INFO_MESSAGE = "Key Validation is corrupt";
+		private const string KEY_HAS_DUPLICATE_F = "Key {0} has a duplicate!";
 
 		// Capsule == ID & Storage
 		// Ref == ID, Type & Storage
@@ -166,7 +220,7 @@ namespace RDP.SaveLoadSystem.Internal
 				get
 				{
 					
-					State worstState = State.Normal;
+					CorruptionState worstState = CorruptionState.None;
 					string info = string.Empty;
 					List<BaseKeyItem> keyItems = new List<BaseKeyItem>(ValKeys);
 					keyItems.AddRange(RefsKeys);
@@ -182,7 +236,7 @@ namespace RDP.SaveLoadSystem.Internal
 					}
 
 					StorageKeyEntry[] missingKeys = GetMissingKeyEntries();
-					if (missingKeys.Length > 0 && worstState != State.Error)
+					if (missingKeys.Length > 0 && worstState != CorruptionState.Error)
 					{
 						StringBuilder messageBuilder = new StringBuilder();
 						messageBuilder.AppendLine("The following keys are expected but not found:");
@@ -202,14 +256,14 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 			}
 
-			public override State CorruptionState
+			public override CorruptionState CorruptionState
 			{
 				get
 				{
 					List<BaseKeyItem> keys = new List<BaseKeyItem>(ValKeys);
 					keys.AddRange(RefsKeys);
-					State worstKeysState = GetWorstState(keys.ToArray());
-					State missingEntriesState = GetMissingKeyEntries().Length > 0 ? State.Warning : State.Normal;
+					CorruptionState worstKeysState = GetWorstState(keys.ToArray());
+					CorruptionState missingEntriesState = GetMissingKeyEntries().Length > 0 ? CorruptionState.Warning : CorruptionState.None;
 					return GetWorstState(worstKeysState, missingEntriesState);
 				}
 			}
@@ -305,7 +359,7 @@ namespace RDP.SaveLoadSystem.Internal
 				get; private set;
 			}
 
-			public override State CorruptionState
+			public override CorruptionState CorruptionState
 			{
 				get
 				{
@@ -340,11 +394,11 @@ namespace RDP.SaveLoadSystem.Internal
 				get; private set;
 			}
 
-			public override State CorruptionState
+			public override CorruptionState CorruptionState
 			{
 				get
 				{
-					return GetWorstState(GetTypeCurruptionState(), StorageItem.CorruptionState);
+					return GetWorstState(GetTypeCurruptionState(), StorageItem.CorruptionState, _keyEntry.HasDuplicate ? CorruptionState.Error : CorruptionState.None);
 				}
 			}
 
@@ -360,6 +414,10 @@ namespace RDP.SaveLoadSystem.Internal
 
 			public string GetInfoText()
 			{
+				if(_keyEntry.HasDuplicate)
+				{
+					return string.Format(KEY_HAS_DUPLICATE_F, _keyEntry.StorageKey);
+				}
 				return GetTypeInfoText();
 			}
 
@@ -386,19 +444,19 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 			}
 
-			private State GetTypeCurruptionState()
+			private CorruptionState GetTypeCurruptionState()
 			{
 				if (_editableRefValue.ReferenceType == null)
 				{
-					return State.Error;
+					return CorruptionState.Error;
 				}
 				else if(!_keyEntry.IsValid)
 				{
-					return State.Warning;
+					return CorruptionState.Warning;
 				}
 				else
 				{
-					return _keyEntry.IsOfExpectedType(_editableRefValue.ReferenceType) ? State.Normal : State.Error;
+					return _keyEntry.IsOfExpectedType(_editableRefValue.ReferenceType) ? CorruptionState.None : CorruptionState.Error;
 				}
 			}
 		}
@@ -440,18 +498,18 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 			}
 
-			public override State CorruptionState
+			public override CorruptionState CorruptionState
 			{
 				get
 				{
-					GetCorruptStateWithInfo(out State state, out _);
+					GetCorruptStateWithInfo(out CorruptionState state, out _);
 					return state;
 				}
 			}
 
 			protected override void OnRenderGUI(int layer)
 			{
-				if (GetDictState(out State keyState, out string infoKey, out State valueState, out string infoValue))
+				if (GetDictState(out CorruptionState keyState, out string infoKey, out CorruptionState valueState, out string infoValue))
 				{
 					foreach (DictItem item in _dictValue.Value.Items)
 					{
@@ -461,7 +519,7 @@ namespace RDP.SaveLoadSystem.Internal
 						GUILayout.EndVertical();
 					}
 				}
-				else if(GetArrayState(out State arrayState, out string arrayInfo))
+				else if(GetArrayState(out CorruptionState arrayState, out string arrayInfo))
 				{
 					for(int i = 0; i < _arrayValue.Value.Items.Length; i++)
 					{
@@ -473,56 +531,63 @@ namespace RDP.SaveLoadSystem.Internal
 				}
 				else
 				{
-					GetCorruptStateWithInfo(out State state, out string info);
+					GetCorruptStateWithInfo(out CorruptionState state, out string info);
 					DrawTypeItemLabel(_valueSection.ValueString, GetTypeString(_valueSection.GetSafeValueType(), _valueSection.ValueType), info, state);
 				}
 			}
 
-			public void GetCorruptStateWithInfo(out State state, out string info)
+			public void GetCorruptStateWithInfo(out CorruptionState state, out string info)
 			{
 				if(!_keyEntry.IsValid)
 				{
-					state = State.Warning;
+					state = CorruptionState.Warning;
 					info = KEY_VALIDATION_CORRUPT_INFO_MESSAGE;
 					return;
 				}
 
 				if (Storage.STORAGE_REFERENCE_TYPE_STRING_KEY == _keyEntry.StorageKey)
 				{
-					state = _keyEntry.IsOfExpectedType(_valueSection.ValueString) ? State.Normal : State.Error;
-					info = state == State.Normal ? string.Empty : $"Type is not of interface `{nameof(ISaveable)}`";
+					state = _keyEntry.IsOfExpectedType(_valueSection.ValueString) ? CorruptionState.None : CorruptionState.Error;
+					info = state == CorruptionState.None ? string.Empty : $"Type is not of interface `{nameof(ISaveable)}`";
+					return;
+				}
+
+				if(_keyEntry.HasDuplicate)
+				{
+					state = CorruptionState.Error;
+					info = string.Format(KEY_HAS_DUPLICATE_F, _keyEntry.StorageKey);
 					return;
 				}
 
 				if (_valueSection.GetSafeValueType() == null || _keyEntry.GetExpectedType() == null)
 				{
-					state = State.Error;
-					info = state == State.Normal ? string.Empty : TYPE_NOT_FOUND_INFO_MESSAGE;
+					state = CorruptionState.Error;
+					info = state == CorruptionState.None ? string.Empty : TYPE_NOT_FOUND_INFO_MESSAGE;
 					return;
 				}
 
-				if (GetDictState(out State keyState, out string a, out State valueState, out string b))
+				if (GetDictState(out CorruptionState keyState, out string a, out CorruptionState valueState, out string b))
 				{
 					state = GetWorstState(keyState, valueState);
-					info = state == State.Normal ? string.Empty : (a.Length > b.Length ? a : b);
+					info = state == CorruptionState.None ? string.Empty : (a.Length > b.Length ? a : b);
 					return;
 				}
 
-				if(GetArrayState(out State arrayState, out string arrayInfo))
+				if(GetArrayState(out CorruptionState arrayState, out string arrayInfo))
 				{
 					state = arrayState;
 					info = arrayInfo;
 					return;
 				}
 
-				state = _keyEntry.IsOfExpectedType(_valueSection.GetSafeValueType()) ? State.Normal : State.Error;
-				info = state == State.Normal ? string.Empty : string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, _keyEntry.GetExpectedType().Name, _valueSection.GetSafeValueType().Name);
+				state = _keyEntry.IsOfExpectedType(_valueSection.GetSafeValueType()) ? CorruptionState.None : CorruptionState.Error;
+				info = state == CorruptionState.None ? string.Empty : string.Format(EXPECTED_TYPE_INFO_MESSAGE_F, _keyEntry.GetExpectedType().Name, _valueSection.GetSafeValueType().Name);
 			}
 
-			private bool GetArrayState(out State arrayState, out string info)
+			private bool GetArrayState(out CorruptionState arrayState, out string info)
 			{
 				info = string.Empty;
-				arrayState = State.Normal;
+				arrayState = CorruptionState.None;
 
 				if(IsArray)
 				{
@@ -531,9 +596,9 @@ namespace RDP.SaveLoadSystem.Internal
 						if (_keyEntry.TryGetExpectedArrayType(out Type expectedArrayType))
 						{
 							SaveableValueSection item = _arrayValue.Value.Items[0];
-							arrayState = item.GetSafeValueType() != null && expectedArrayType.IsAssignableFrom(item.GetSafeValueType()) ? State.Normal : State.Error;
+							arrayState = item.GetSafeValueType() != null && expectedArrayType.IsAssignableFrom(item.GetSafeValueType()) ? CorruptionState.None : CorruptionState.Error;
 
-							if (arrayState == State.Error)
+							if (arrayState == CorruptionState.Error)
 							{
 								if (item.GetSafeValueType() == null)
 								{
@@ -552,12 +617,12 @@ namespace RDP.SaveLoadSystem.Internal
 				return false;
 			}
 
-			private bool GetDictState(out State keyState, out string infoKey, out State valueState, out string infoValue)
+			private bool GetDictState(out CorruptionState keyState, out string infoKey, out CorruptionState valueState, out string infoValue)
 			{
 				infoKey = string.Empty;
 				infoValue = string.Empty;
-				keyState = State.Normal;
-				valueState = State.Normal;
+				keyState = CorruptionState.None;
+				valueState = CorruptionState.None;
 
 				if (IsDict)
 				{
@@ -569,10 +634,10 @@ namespace RDP.SaveLoadSystem.Internal
 							Type tKey = item.KeySection.GetSafeValueType();
 							Type tValue = item.ValueSection.GetSafeValueType();
 
-							keyState = tKey != null && expectedKeyType.IsAssignableFrom(tKey) ? State.Normal : State.Error;
-							valueState = tValue != null && expectedValueType.IsAssignableFrom(tValue) ? State.Normal : State.Error;
+							keyState = tKey != null && expectedKeyType.IsAssignableFrom(tKey) ? CorruptionState.None : CorruptionState.Error;
+							valueState = tValue != null && expectedValueType.IsAssignableFrom(tValue) ? CorruptionState.None : CorruptionState.Error;
 
-							if(keyState == State.Error)
+							if(keyState == CorruptionState.Error)
 							{
 								if(tKey == null)
 								{
@@ -584,7 +649,7 @@ namespace RDP.SaveLoadSystem.Internal
 								}
 							}
 
-							if (valueState == State.Error)
+							if (valueState == CorruptionState.Error)
 							{
 								if (tValue == null)
 								{
@@ -616,7 +681,7 @@ namespace RDP.SaveLoadSystem.Internal
 				get; private set;
 			}
 
-			public override State CorruptionState
+			public override CorruptionState CorruptionState
 			{
 				get
 				{
@@ -677,11 +742,11 @@ namespace RDP.SaveLoadSystem.Internal
 				get; private set;
 			}
 
-			public override State CorruptionState
+			public override CorruptionState CorruptionState
 			{
 				get
 				{
-					return ValItem.CorruptionState;
+					return GetWorstState(ValItem.CorruptionState);
 				}
 			}
 
@@ -795,14 +860,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 		private abstract class BaseItem
 		{
-			public enum State
-			{
-				Normal = 0,
-				Warning = 1,
-				Error = 2
-			}
-
-			public abstract State CorruptionState
+			public abstract CorruptionState CorruptionState
 			{
 				get;
 			}
@@ -824,26 +882,26 @@ namespace RDP.SaveLoadSystem.Internal
 
 			protected abstract void OnRenderGUI(int layer);
 
-			protected string GetCorruptionStateIcon(State state)
+			protected string GetCorruptionStateIcon(CorruptionState state)
 			{
 				switch (state)
 				{
-					case State.Error:
+					case CorruptionState.Error:
 						return "[!]";
-					case State.Warning:
+					case CorruptionState.Warning:
 						return "[?]";
 					default:
 						return string.Empty;
 				}
 			}
 
-			protected Color? GetCorruptionStateColor(State state)
+			protected Color? GetCorruptionStateColor(CorruptionState state)
 			{
 				switch (state)
 				{
-					case State.Error:
+					case CorruptionState.Error:
 						return Color.red;
-					case State.Warning:
+					case CorruptionState.Warning:
 						return new Color(1f, 0.65f, 0f);
 					default:
 						return null;
@@ -852,7 +910,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 			protected void DrawNormalItemLabel(string labelValue, string infoText = "")
 			{
-				DrawItemLabel(labelValue, infoText, State.Normal);
+				DrawItemLabel(labelValue, infoText, CorruptionState.None);
 			}
 
 			protected void DrawItemLabel(string labelValue, string infoText = "")
@@ -860,7 +918,7 @@ namespace RDP.SaveLoadSystem.Internal
 				DrawItemLabel(labelValue, infoText, CorruptionState);
 			}
 
-			protected void DrawItemLabel(string labelValue, string infoText, State curruptionState)
+			protected void DrawItemLabel(string labelValue, string infoText, CorruptionState curruptionState)
 			{
 				GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
 
@@ -891,7 +949,7 @@ namespace RDP.SaveLoadSystem.Internal
 				DrawTypeItemLabel(labelValue, typeValue, infoText, CorruptionState);
 			}
 
-			protected void DrawTypeItemLabel(string labelValue, string typeValue, string infoText, State curruptionState)
+			protected void DrawTypeItemLabel(string labelValue, string typeValue, string infoText, CorruptionState curruptionState)
 			{
 				DrawItemLabel(string.Concat(labelValue, " << ", typeValue), infoText, curruptionState);
 			}
@@ -901,14 +959,14 @@ namespace RDP.SaveLoadSystem.Internal
 				return type == null ? typeString : type.Name;
 			}
 
-			protected State GetWorstState(params BaseItem[] items)
+			protected CorruptionState GetWorstState(params BaseItem[] items)
 			{
 				return GetWorstState(items.Select(x => x.CorruptionState).ToArray());
 			}
 
-			protected State GetWorstState(params State[] states)
+			protected CorruptionState GetWorstState(params CorruptionState[] states)
 			{
-				State state = State.Normal;
+				CorruptionState state = CorruptionState.None;
 
 				if (states == null || states.Length == 0)
 					return state;
