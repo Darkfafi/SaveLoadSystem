@@ -5,7 +5,7 @@ namespace RDP.SaveLoadSystem.Internal
 {
 	public interface IStorageDictionaryEditor : IReferenceStorageDictionaryEditor, IValueStorageDictionaryEditor
 	{
-		
+
 	}
 
 	public interface IReferenceStorageDictionaryEditor

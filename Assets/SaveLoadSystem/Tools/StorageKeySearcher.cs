@@ -21,17 +21,17 @@ namespace RDP.SaveLoadSystem.Internal
 
 		public static Dictionary<string, StorageKeyEntry> GetKeyEntries(Type saveableType)
 		{
-			if (saveableType == null)
+			if(saveableType == null)
 				return new Dictionary<string, StorageKeyEntry>();
 
 			FieldInfo[] fields = saveableType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
 			Dictionary<string, StorageKeyEntry> keyEntries = new Dictionary<string, StorageKeyEntry>();
 
 			// Add keys of the saveable itself
-			foreach (FieldInfo fInfo in fields)
+			foreach(FieldInfo fInfo in fields)
 			{
 				StorageKeyAttribute keyAttribute = fInfo.GetCustomAttribute<StorageKeyAttribute>(true);
-				if (keyAttribute != null)
+				if(keyAttribute != null)
 				{
 					StorageKeyEntry entry = new StorageKeyEntry(fInfo.GetValue(null) as string, keyAttribute.ExpectedType, keyAttribute.IsOptional);
 					AddKeyEntry(keyEntries, entry);
@@ -40,7 +40,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 			// Add keys of StorageKeysHolders (holding keys for other types)
 			StorageKeysHolderAttribute ska = saveableType.GetCustomAttribute<StorageKeysHolderAttribute>(false);
-			if (ska == null || !ska.ContainerForType.IsAssignableFrom(saveableType))
+			if(ska == null || !ska.ContainerForType.IsAssignableFrom(saveableType))
 			{
 				Type[] storageKeysHolders = Assembly.GetAssembly(typeof(StorageKeysHolderAttribute)).GetTypes().Where(x =>
 				{
@@ -48,10 +48,10 @@ namespace RDP.SaveLoadSystem.Internal
 					return attr != null && attr.ContainerForType.IsAssignableFrom(saveableType);
 				}).ToArray();
 
-				for (int i = 0; i < storageKeysHolders.Length; i++)
+				for(int i = 0; i < storageKeysHolders.Length; i++)
 				{
 					Dictionary<string, StorageKeyEntry> storageKeysHolderEntries = GetKeyEntries(storageKeysHolders[i]);
-					foreach (var newKeyEntryPair in storageKeysHolderEntries)
+					foreach(var newKeyEntryPair in storageKeysHolderEntries)
 					{
 						AddKeyEntry(keyEntries, newKeyEntryPair.Value);
 					}
@@ -62,7 +62,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 		private static void AddKeyEntry(Dictionary<string, StorageKeyEntry> entries, StorageKeyEntry entry)
 		{
-			if (!entries.ContainsKey(entry.StorageKey))
+			if(!entries.ContainsKey(entry.StorageKey))
 			{
 				entries.Add(entry.StorageKey, entry);
 			}
@@ -127,7 +127,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 			public bool TryGetExpectedDictTypes(out Type keyType, out Type valueType)
 			{
-				if (!_expectedType.IsInterface && _expectedType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+				if(!_expectedType.IsInterface && _expectedType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
 				{
 					Type[] arguments = _expectedType.GetGenericArguments();
 					keyType = arguments[0];
@@ -142,7 +142,7 @@ namespace RDP.SaveLoadSystem.Internal
 
 			public bool TryGetExpectedArrayType(out Type arrayType)
 			{
-				if (_expectedType.IsArray)
+				if(_expectedType.IsArray)
 				{
 					arrayType = _expectedType.GetElementType();
 					return true;

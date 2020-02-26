@@ -24,7 +24,7 @@ namespace RDP.SaveLoadSystem
 
 		public string[] GetRefStorageKeys()
 		{
-			if (_keyToReferenceID != null)
+			if(_keyToReferenceID != null)
 			{
 				string[] keys = new string[_keyToReferenceID.Keys.Count];
 				_keyToReferenceID.Keys.CopyTo(keys, 0);
@@ -48,7 +48,7 @@ namespace RDP.SaveLoadSystem
 		{
 			_storageAccess = storageAccess;
 			_keyToReferenceID = loadedRefs;
-			if (LoadValues(REF_KEYS_TO_KEEP_KEY, out string[] keysToKeep))
+			if(LoadValues(REF_KEYS_TO_KEEP_KEY, out string[] keysToKeep))
 			{
 				_keysToKeep = new List<string>(keysToKeep);
 			}
@@ -122,9 +122,7 @@ namespace RDP.SaveLoadSystem
 
 		bool IStorageReferenceLoader.LoadRefs<T>(string key, StorageLoadMultipleHandler<T> refLoadedCallback)
 		{
-			object refIDsObject;
-
-			if(!_keyToReferenceID.TryGetValue(key, out refIDsObject))
+			if(!_keyToReferenceID.TryGetValue(key, out object refIDsObject))
 			{
 				refLoadedCallback(new T[] { });
 				return false;
@@ -149,9 +147,7 @@ namespace RDP.SaveLoadSystem
 
 		public string GetRefID(string key)
 		{
-			object refIDObject;
-
-			if(_keyToReferenceID.TryGetValue(key, out refIDObject))
+			if(_keyToReferenceID.TryGetValue(key, out object refIDObject))
 			{
 				return refIDObject.ToString();
 			}
@@ -177,9 +173,8 @@ namespace RDP.SaveLoadSystem
 
 		public EditableRefValue[] GetValueRefs(string key)
 		{
-			object refIDsObject = null;
 			List<EditableRefValue> returnValues = new List<EditableRefValue>();
-			if (!_keyToReferenceID.TryGetValue(key, out refIDsObject))
+			if(!_keyToReferenceID.TryGetValue(key, out object refIDsObject))
 			{
 				return returnValues.ToArray();
 			}
@@ -195,7 +190,7 @@ namespace RDP.SaveLoadSystem
 		{
 			_keyToReferenceID.Remove(key);
 
-			if (_keysToKeep.Contains(key))
+			if(_keysToKeep.Contains(key))
 				_keysToKeep.Remove(key);
 
 			SetKeysToKeep();
@@ -205,7 +200,7 @@ namespace RDP.SaveLoadSystem
 		{
 			_keyToReferenceID[key] = refValue.ReferenceID;
 
-			if (!_keysToKeep.Contains(key))
+			if(!_keysToKeep.Contains(key))
 				_keysToKeep.Add(key);
 
 			SetKeysToKeep();
@@ -214,17 +209,17 @@ namespace RDP.SaveLoadSystem
 		public void SetValueRefs(string key, EditableRefValue[] refsValues)
 		{
 			string idsCollection = "";
-			for (int i = 0, c = refsValues.Length; i < c; i++)
+			for(int i = 0, c = refsValues.Length; i < c; i++)
 			{
 				idsCollection += refsValues[i].ReferenceID;
-				if (i < c - 1)
+				if(i < c - 1)
 				{
 					idsCollection += ",";
 				}
 			}
 			_keyToReferenceID.Add(key, idsCollection);
 
-			if (!_keysToKeep.Contains(key))
+			if(!_keysToKeep.Contains(key))
 				_keysToKeep.Add(key);
 
 			SetKeysToKeep();
@@ -232,8 +227,7 @@ namespace RDP.SaveLoadSystem
 
 		public void RelocateValueRef(string currentKey, string newKey)
 		{
-			object value;
-			if(_keyToReferenceID.TryGetValue(currentKey, out value))
+			if(_keyToReferenceID.TryGetValue(currentKey, out object value))
 			{
 				string refID = value.ToString();
 				RemoveValueRef(currentKey);

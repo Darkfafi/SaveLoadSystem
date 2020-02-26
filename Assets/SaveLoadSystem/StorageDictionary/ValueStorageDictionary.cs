@@ -21,7 +21,7 @@ namespace RDP.SaveLoadSystem
 
 		public string[] GetValueStorageKeys()
 		{
-			if (_keyToNormalValue != null)
+			if(_keyToNormalValue != null)
 			{
 				string[] keys = new string[_keyToNormalValue.Keys.Count];
 				_keyToNormalValue.Keys.CopyTo(keys, 0);
@@ -87,15 +87,13 @@ namespace RDP.SaveLoadSystem
 		public bool LoadValues<T>(string key, out T[] values) where T : IConvertible, IComparable
 		{
 			ThrowExceptionWhenISaveable("It is forbidden use this method to load an `ISaveable`! Use `LoadRefs` instead!", typeof(T));
-			SaveableArray<T> oldSaveableArray;
-			SaveableArray newSaveableArray;
 
-			if (LoadStruct(key, out oldSaveableArray))
+			if(LoadStruct(key, out SaveableArray<T> oldSaveableArray))
 			{
 				values = SaveableArray<T>.To(oldSaveableArray);
 				return true;
 			}
-			else if (LoadStruct(key, out newSaveableArray))
+			else if(LoadStruct(key, out SaveableArray newSaveableArray))
 			{
 				values = SaveableArray.To<T>(newSaveableArray);
 				return true;
@@ -107,15 +105,13 @@ namespace RDP.SaveLoadSystem
 
 		public T LoadValue<T>(string key) where T : IConvertible, IComparable
 		{
-			T value;
-			LoadValue(key, out value);
+			LoadValue(key, out T value);
 			return value;
 		}
 
 		public T[] LoadValues<T>(string key) where T : IConvertible, IComparable
 		{
-			T[] values;
-			LoadValues(key, out values);
+			LoadValues(key, out T[] values);
 			return values;
 		}
 
@@ -136,15 +132,13 @@ namespace RDP.SaveLoadSystem
 
 		public bool LoadStructs<T>(string key, out T[] values) where T : struct
 		{
-			SaveableArray<T> oldSaveableArray;
-			SaveableArray newSaveableArray;
 
-			if (LoadStruct(key, out oldSaveableArray))
+			if(LoadStruct(key, out SaveableArray<T> oldSaveableArray))
 			{
 				values = SaveableArray<T>.To(oldSaveableArray);
 				return true;
 			}
-			else if (LoadStruct(key, out newSaveableArray))
+			else if(LoadStruct(key, out SaveableArray newSaveableArray))
 			{
 				values = SaveableArray.To<T>(newSaveableArray);
 				return true;
@@ -156,15 +150,13 @@ namespace RDP.SaveLoadSystem
 
 		public T LoadStruct<T>(string key) where T : struct
 		{
-			T value;
-			LoadStruct(key, out value);
+			LoadStruct(key, out T value);
 			return value;
 		}
 
 		public T[] LoadStructs<T>(string key) where T : struct
 		{
-			T[] values;
-			LoadStructs(key, out values);
+			LoadStructs(key, out T[] values);
 			return values;
 		}
 
@@ -178,15 +170,13 @@ namespace RDP.SaveLoadSystem
 		{
 			ThrowExceptionWhenISaveable("It is forbidden to load a dictionary containing an `ISaveable`!", typeof(T), typeof(U));
 
-			SaveableDict<T, U> sdOld;
-			SaveableDict sdNew;
 
-			if (LoadStruct(key, out sdOld))
+			if(LoadStruct(key, out SaveableDict<T, U> sdOld))
 			{
 				value = SaveableDict<T, U>.To(sdOld);
 				return true;
 			}
-			else if (LoadStruct(key, out sdNew))
+			else if(LoadStruct(key, out SaveableDict sdNew))
 			{
 				value = SaveableDict.To<T, U>(sdNew);
 				return true;
@@ -219,8 +209,7 @@ namespace RDP.SaveLoadSystem
 
 		public SaveableValueSection GetValueSection(string key)
 		{
-			SaveableValueSection readValue;
-			if(_keyToNormalValue.TryGetValue(key, out readValue))
+			if(_keyToNormalValue.TryGetValue(key, out SaveableValueSection readValue))
 			{
 				return readValue;
 			}
@@ -229,7 +218,7 @@ namespace RDP.SaveLoadSystem
 
 		public void SetValueSection(string key, SaveableValueSection section)
 		{
-			if (_keyToNormalValue.ContainsKey(key))
+			if(_keyToNormalValue.ContainsKey(key))
 			{
 				_keyToNormalValue[key] = section;
 			}
@@ -238,9 +227,9 @@ namespace RDP.SaveLoadSystem
 				_keyToNormalValue.Add(key, section);
 			}
 
-			if (key != VALUE_KEYS_TO_KEEP_KEY)
+			if(key != VALUE_KEYS_TO_KEEP_KEY)
 			{
-				if (!_keysToKeep.Contains(key))
+				if(!_keysToKeep.Contains(key))
 					_keysToKeep.Add(key);
 
 				SetKeysToKeep();
@@ -251,7 +240,7 @@ namespace RDP.SaveLoadSystem
 		{
 			_keyToNormalValue.Remove(key);
 
-			if (_keysToKeep.Contains(key))
+			if(_keysToKeep.Contains(key))
 			{
 				_keysToKeep.Remove(key);
 			}
@@ -261,8 +250,7 @@ namespace RDP.SaveLoadSystem
 
 		public void RelocateValue(string currentKey, string newKey)
 		{
-			SaveableValueSection value;
-			if(_keyToNormalValue.TryGetValue(currentKey, out value))
+			if(_keyToNormalValue.TryGetValue(currentKey, out SaveableValueSection value))
 			{
 				RemoveValue(currentKey);
 				SetValue(newKey, value.GetValue());
@@ -288,13 +276,11 @@ namespace RDP.SaveLoadSystem
 
 		private bool Load<T>(string key, out T value)
 		{
-			SaveableValueSection v;
-			value = default(T);
-
-			if(!_keyToNormalValue.TryGetValue(key, out v))
+			value = default;
+			if(!_keyToNormalValue.TryGetValue(key, out SaveableValueSection v))
 				return false;
 
-			if (v.GetValueType() == null)
+			if(v.GetValueType() == null)
 			{
 				UnityEngine.Debug.LogError($"No Type found for {key}'s value {value.GetType().Name}. This means the type was removed or renamed. Please migrate this change to the correct type!");
 				return false;
