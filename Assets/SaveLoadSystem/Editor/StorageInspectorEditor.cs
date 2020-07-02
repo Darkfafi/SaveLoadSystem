@@ -1,6 +1,4 @@
-﻿using Internal;
-using RDP.SaveLoadSystem.Internal.Utils;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -9,7 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using static RDP.SaveLoadSystem.Internal.StorageKeySearcher;
 
-namespace RDP.SaveLoadSystem.Internal
+namespace RDP.SaveLoadSystem.Internal.Utils
 {
 	public class StorageInspectorEditor : EditorWindow
 	{
@@ -40,6 +38,11 @@ namespace RDP.SaveLoadSystem.Internal
 			for(int i = 0; i < capsuleItems.Length; i++)
 			{
 				CapsuleItem capsuleItem = capsuleItems[i];
+
+				if(capsuleItem.StorageItem.IsEmpty)
+				{
+					continue;
+				}
 
 				if(worstCorruptionState < capsuleItem.CorruptionState)
 				{
@@ -94,7 +97,7 @@ namespace RDP.SaveLoadSystem.Internal
 			return storageCapsules.ToArray();
 		}
 
-		[MenuItem(InternalConsts.MENU_ITEM_PREFIX + "Storage/Storage Inspector")]
+		[MenuItem(EditorMenu.BASE_ROUTE + "Open Storage Inspector")]
 		private static void Init()
 		{
 			OpenWindow();
@@ -214,6 +217,8 @@ namespace RDP.SaveLoadSystem.Internal
 			{
 				get; private set;
 			}
+
+			public bool IsEmpty => ValKeys.Length == 0 && RefsKeys.Length == 0;
 
 			public override string TitleInfo
 			{
@@ -542,13 +547,6 @@ namespace RDP.SaveLoadSystem.Internal
 				{
 					state = CorruptionState.Warning;
 					info = KEY_VALIDATION_CORRUPT_INFO_MESSAGE;
-					return;
-				}
-
-				if(Storage.STORAGE_REFERENCE_TYPE_STRING_KEY == _keyEntry.StorageKey)
-				{
-					state = _keyEntry.IsOfExpectedType(_valueSection.ValueString) ? CorruptionState.None : CorruptionState.Error;
-					info = state == CorruptionState.None ? string.Empty : $"Type is not of interface `{nameof(ISaveable)}`";
 					return;
 				}
 

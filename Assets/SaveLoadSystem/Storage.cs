@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
@@ -17,11 +18,16 @@ namespace RDP.SaveLoadSystem
 			Base64,
 		}
 
-		[StorageKey(typeof(ISaveable))]
+		[StorageKey(typeof(string))]
 		public const string STORAGE_REFERENCE_TYPE_STRING_KEY = "RESERVED_REFERENCE_TYPE_FULL_NAME_STRING_RESERVED";
+
+		[StorageKey(typeof(ulong))]
+		public const string STORAGE_REFERENCE_TYPE_ID_ULONG_KEY = "RESERVED_REFERENCE_TYPE_ID_ULONG_RESERVED";
 
 		public const string ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID = "ID_CAPSULE_SAVE_DATA";
 		public const string SAVE_FILE_EXTENSION = "rdpsf";
+
+		public const string STORAGE_OBJECT_FACTORY_TYPE_NAME = "StorageObjectFactory";
 
 		public SaveableReferenceIdHandler ActiveRefHandler
 		{
@@ -39,6 +45,7 @@ namespace RDP.SaveLoadSystem
 		}
 
 		private Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>> _cachedStorageCapsules = new Dictionary<IStorageCapsule, Dictionary<string, StorageDictionary>>();
+		private IStorageObjectFactory _storageObjectFactory;
 
 		public static string GetPathToStorageCapsule(string locationPath, IStorageCapsule capsule, bool addFileType)
 		{
@@ -50,8 +57,14 @@ namespace RDP.SaveLoadSystem
 			return Path.Combine(Application.persistentDataPath, locationPath);
 		}
 
+		public static Type GetStorageFactoryType()
+		{
+			return AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).FirstOrDefault(x => x.Name == STORAGE_OBJECT_FACTORY_TYPE_NAME);
+		}
+
 		public Storage(string storageLocationPath, EncodingType encodingType, params IStorageCapsule[] allStorageCapsules)
 		{
+			_storageObjectFactory = Activator.CreateInstance(GetStorageFactoryType()) as IStorageObjectFactory;
 			StorageLocationPath = storageLocationPath;
 			EncodingOption = encodingType;
 			UpdateStorage(allStorageCapsules);
@@ -99,16 +112,21 @@ namespace RDP.SaveLoadSystem
 							capsuleToStorage.Key.Load(storage);
 							_allLoadedReferences.Add(capsuleToStorage.Key);
 						}
+						else if(storage.LoadValue(STORAGE_REFERENCE_TYPE_ID_ULONG_KEY, out ulong classTypeId))
+						{
+							ISaveable referenceInstance = _storageObjectFactory.LoadSaveableObject(classTypeId, storage);
+							ActiveRefHandler.SetReferenceReady(referenceInstance, id);
+							_allLoadedReferences.Add(referenceInstance);
+						}
 						else if(storage.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out string classTypeFullName))
 						{
-							IStorageLoader loader = storage;
 							Type referenceType = Type.GetType(classTypeFullName);
 							bool methodLoadInterface = typeof(ISaveableLoad).IsAssignableFrom(referenceType);
-							ISaveable referenceInstance = (methodLoadInterface ? Activator.CreateInstance(referenceType) : Activator.CreateInstance(referenceType, loader)) as ISaveable;
+							ISaveable referenceInstance = (methodLoadInterface ? Activator.CreateInstance(referenceType) : Activator.CreateInstance(referenceType, storage)) as ISaveable;
 							ActiveRefHandler.SetReferenceReady(referenceInstance, id);
 
 							if(methodLoadInterface)
-								((ISaveableLoad)referenceInstance).Load(loader);
+								((ISaveableLoad)referenceInstance).Load(storage);
 
 							_allLoadedReferences.Add(referenceInstance);
 						}
@@ -162,6 +180,7 @@ namespace RDP.SaveLoadSystem
 							StorageDictionary storageDictForRef = new StorageDictionary(pair.Key.ID, this);
 							referencesSaved.Add(refID, storageDictForRef);
 							storageDictForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceInstance.GetType().AssemblyQualifiedName);
+							storageDictForRef.SaveValue(STORAGE_REFERENCE_TYPE_ID_ULONG_KEY, _storageObjectFactory.GetIdForSaveable(referenceInstance.GetType()));
 							referenceInstance.Save(storageDictForRef);
 
 							if(pair.Value.TryGetValue(refID, out StorageDictionary oldData))
@@ -234,11 +253,23 @@ namespace RDP.SaveLoadSystem
 					{
 						foreach(var storageItem in capsuleToStorage.Value)
 						{
-							string referenceTypeString;
-							if(storageItem.Key != ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID && storageItem.Value.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out referenceTypeString))
+							if(storageItem.Key != ROOT_SAVE_DATA_CAPSULE_REFERENCE_ID)
 							{
-								Type referenceType = Type.GetType(referenceTypeString);
-								refStorages.Add(new KeyValuePair<Type, IStorageDictionaryEditor>(referenceType, storageItem.Value));
+								Type referenceType = null;
+
+								if(storageItem.Value.LoadValue(STORAGE_REFERENCE_TYPE_ID_ULONG_KEY, out ulong classTypeId))
+								{
+									referenceType = _storageObjectFactory.GetTypeForId(classTypeId);
+								}
+								else if(storageItem.Value.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out string referenceTypeString))
+								{
+									referenceType = Type.GetType(referenceTypeString);
+								}
+
+								if(referenceType != null)
+								{
+									refStorages.Add(new KeyValuePair<Type, IStorageDictionaryEditor>(referenceType, storageItem.Value));
+								}
 							}
 						}
 					}
@@ -358,8 +389,12 @@ namespace RDP.SaveLoadSystem
 				{
 					if(item.Value.TryGetValue(refID, out StorageDictionary storageForRef))
 					{
-						string referenceTypeString;
-						if(storageForRef.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out referenceTypeString))
+						if(storageForRef.LoadValue(STORAGE_REFERENCE_TYPE_ID_ULONG_KEY, out ulong classTypeId))
+						{
+							return new EditableRefValue(refID, _storageObjectFactory.GetTypeForId(classTypeId).AssemblyQualifiedName, storageForRef);
+						}
+
+						if(storageForRef.LoadValue(STORAGE_REFERENCE_TYPE_STRING_KEY, out string referenceTypeString))
 						{
 							return new EditableRefValue(refID, referenceTypeString, storageForRef);
 						}
@@ -382,6 +417,7 @@ namespace RDP.SaveLoadSystem
 				{
 					StorageDictionary storageForRef = new StorageDictionary(storageCapsuleID, this);
 					storageForRef.SaveValue(STORAGE_REFERENCE_TYPE_STRING_KEY, referenceType.AssemblyQualifiedName);
+					storageForRef.SaveValue(STORAGE_REFERENCE_TYPE_ID_ULONG_KEY, _storageObjectFactory.GetIdForSaveable(referenceType));
 					string randomOnFlyID = Guid.NewGuid().ToString("N");
 					editableRefValue = new EditableRefValue(randomOnFlyID, referenceType.AssemblyQualifiedName, storageForRef);
 					capsuleToEdit = item.Key;

@@ -1,0 +1,17 @@
+{
+    "name": "RDP.SaveLoadSystem.Editor",
+    "references": [
+        "GUID:9d19fedefb664ce42a8d34a7cbef427b"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
