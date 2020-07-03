@@ -85,7 +85,7 @@ namespace RDP.SaveLoadSystem.Internal.Utils
 		private static IStorageCapsule[] GetStorageCapsuleInstances()
 		{
 			List<IStorageCapsule> storageCapsules = new List<IStorageCapsule>();
-			Type[] storageCapsuleTypes = Assembly.GetAssembly(typeof(IStorageCapsule)).GetTypes().Where(x => x.GetInterfaces().Contains(typeof(IStorageCapsule))).ToArray();
+			Type[] storageCapsuleTypes = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).Where(x => x.GetInterfaces().Contains(typeof(IStorageCapsule))).ToArray();
 			for(int i = 0; i < storageCapsuleTypes.Length; i++)
 			{
 				IStorageCapsule instance = Activator.CreateInstance(storageCapsuleTypes[i]) as IStorageCapsule;
