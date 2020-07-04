@@ -48,9 +48,11 @@ namespace RDP.SaveLoadSystem
 		{
 			_storageAccess = storageAccess;
 			_keyToReferenceID = loadedRefs;
-			if(LoadValues(REF_KEYS_TO_KEEP_KEY, out string[] keysToKeep))
+
+			SaveableValueSection keysToKeepSection = GetValueSection(REF_KEYS_TO_KEEP_KEY);
+			if(keysToKeepSection.IsValid)
 			{
-				_keysToKeep = new List<string>(keysToKeep);
+				_keysToKeep = new List<string>(SaveableArray.To<string>((SaveableArray)keysToKeepSection.GetValue(typeof(SaveableArray))));
 			}
 		}
 

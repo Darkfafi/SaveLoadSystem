@@ -67,11 +67,7 @@ namespace RDP.SaveLoadSystem
 			_storageObjectFactory = Activator.CreateInstance(GetStorageFactoryType()) as IStorageObjectFactory;
 			StorageLocationPath = storageLocationPath;
 			EncodingOption = encodingType;
-			UpdateStorage(allStorageCapsules);
-		}
 
-		public void UpdateStorage(params IStorageCapsule[] allStorageCapsules)
-		{
 			_cachedStorageCapsules.Clear();
 			for(int i = 0, c = allStorageCapsules.Length; i < c; i++)
 			{

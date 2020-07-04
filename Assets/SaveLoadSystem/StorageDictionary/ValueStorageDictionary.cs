@@ -50,9 +50,11 @@ namespace RDP.SaveLoadSystem
 		{
 			ParentStorageCapsuleID = parentStorageCapsuleID;
 			_keyToNormalValue = loadedValues;
-			if(LoadValues(VALUE_KEYS_TO_KEEP_KEY, out string[] keysToKeep))
+
+			SaveableValueSection keysToKeepSection = GetValueSection(VALUE_KEYS_TO_KEEP_KEY);
+			if(keysToKeepSection.IsValid)
 			{
-				_keysToKeep = new List<string>(keysToKeep);
+				_keysToKeep = new List<string>(SaveableArray.To<string>((SaveableArray)keysToKeepSection.GetValue(typeof(SaveableArray))));
 			}
 		}
 

@@ -26,9 +26,14 @@ namespace RDP.SaveLoadSystem.Internal
 			}
 		}
 
+		public object GetValue(Type specifiedType)
+		{
+			return PrimitiveToValueParserUtility.FromJSON(ValueString, specifiedType);
+		}
+
 		public object GetValue()
 		{
-			return PrimitiveToValueParserUtility.FromJSON(ValueString, GetValueType());
+			return GetValue(GetValueType());
 		}
 
 		public Type GetValueType()
