@@ -262,7 +262,7 @@ namespace RDP.SaveLoadSystem
 			List<SaveDataItem> items = new List<SaveDataItem>();
 			foreach(var pair in _keyToNormalValue)
 			{
-				items.Add(new SaveDataItem(pair.Key, pair.Value.GetValue()));
+				items.Add(SaveDataItem.CreateFrom(pair.Key, pair.Value));
 			}
 
 			return items.ToArray();

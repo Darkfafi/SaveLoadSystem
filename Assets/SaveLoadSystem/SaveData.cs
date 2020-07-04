@@ -39,6 +39,15 @@ namespace RDP.SaveLoadSystem.Internal
 			ValueSection = new SaveableValueSection(value);
 		}
 
+		public static SaveDataItem CreateFrom(string key, SaveableValueSection saveableValue)
+		{
+			return new SaveDataItem()
+			{
+				SectionKey = key,
+				ValueSection = saveableValue,
+			};
+		}
+
 		public static Dictionary<string, object> ToObjectDictionary(SaveDataItem[] itemsCollection)
 		{
 			Dictionary<string, object> returnValue = new Dictionary<string, object>();
